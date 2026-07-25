@@ -38,7 +38,15 @@ import {
 } from "./credential-strategy.js";
 import { filterValidMcpServers } from "./mcp-validator.js";
 import { createTaskTrackerState, seedTaskFromStart, updateTaskTrackerFromLifecycle, updateTaskTrackerFromTool } from "./task-tracker.js";
-import { registerWarmSession, removeWarmSession, getWarmSession, activePromptChannels, hashCredentials, hashForDebug } from "./persistent-session-registry.js";
+import {
+  registerWarmSession,
+  removeWarmSession,
+  getWarmSession,
+  activePromptChannels,
+  hashCredentials,
+  hasWarmSessionForAgent,
+  hashForDebug,
+} from "./persistent-session-registry.js";
 import type { SessionChannel } from "./persistent-session-registry.js";
 import { randomUUID, createHash } from "node:crypto";
 import { statSync } from "node:fs";
@@ -2191,9 +2199,8 @@ function processResultMessage(
 
 
 // ---------------------------------------------------------------------------
-// Community init is deliberately side-effect free. The local CLI adapter does
-// not have a reusable prewarm transport, so starting a hidden prompt here
-// would launch the model and MCP servers without improving first-turn latency.
+// Lightweight init — mirror the formal build by starting a query only long
+// enough to capture system:init, then abort it before model output begins.
 // ---------------------------------------------------------------------------
 
 export async function handleClaudeInit(
@@ -2201,8 +2208,159 @@ export async function handleClaudeInit(
   emit: EmitFn,
   activeAbortControllers: Map<string, AbortController>,
 ): Promise<void> {
-  activeAbortControllers.delete(cmd.id);
-  emit({ evt: "done", id: cmd.id });
+  const { id, cwd, apiKey, baseUrl, platform } = cmd;
+
+  if (hasWarmSessionForAgent("claude")) {
+    process.stderr.write(
+      `[claude-prewarm:${id}] Active Claude warm session exists — skip prewarm\n`,
+    );
+    emit({ evt: "done", id });
+    return;
+  }
+
+  const releaseCredentialLock = await acquireCredentialLock();
+  const savedEnv = await applyCredentials(
+    platform,
+    apiKey,
+    baseUrl,
+    cmd.model,
+    cmd.proxyUrl,
+  );
+
+  const abortController = new AbortController();
+  activeAbortControllers.set(id, abortController);
+
+  try {
+    const claudePath = findClaudeCodePath();
+    if (!claudePath) {
+      emit({ evt: "done", id });
+      return;
+    }
+
+    const options: Options = {
+      model: cmd.model,
+      cwd,
+      abortController,
+      includePartialMessages: true,
+      pathToClaudeCodeExecutable: claudePath,
+      allowedTools: [],
+      settingSources: ["user", "project", "local"],
+      ...(cmd.ultracode === true
+        ? {
+            thinking: {
+              type: "adaptive",
+              display: "summarized",
+            } as ThinkingConfig,
+            effort: "xhigh" as EffortLevel,
+          }
+        : {}),
+      ...(cmd.ultracode === true || cmd.fastMode === true
+        ? {
+            extraArgs: {
+              settings: JSON.stringify({
+                ...(cmd.ultracode === true
+                  ? { ultracode: true, enableWorkflows: true }
+                  : {}),
+                ...(cmd.fastMode === true ? { fastMode: true } : {}),
+              }),
+            },
+          }
+        : {}),
+    };
+
+    options.env = captureClaudeProviderEnvironment();
+    if (cmd.fastMode === true) {
+      options.env = {
+        ...options.env,
+        CLAUDE_CODE_SKIP_FAST_MODE_ORG_CHECK: "1",
+      };
+    }
+
+    options.stderr = (msg: string) => {
+      process.stderr.write(
+        `[claude-cli] ${summarizeDiagnosticText(msg, "claude.prewarm.stderr")}\n`,
+      );
+    };
+
+    if (cmd.mcpServers && Object.keys(cmd.mcpServers).length > 0) {
+      const { valid, skipped } = filterValidMcpServers(cmd.mcpServers);
+      for (const skippedServer of skipped) {
+        process.stderr.write(
+          `[mcp-validate] Skipping MCP server '${skippedServer.name}' — ${skippedServer.reason}\n`,
+        );
+      }
+      if (Object.keys(valid).length > 0) {
+        options.mcpServers =
+          process.platform === "win32"
+            ? resolveWindowsMcpServers(
+                valid as Record<string, McpServerConfigRaw>,
+              )
+            : valid;
+      }
+    }
+
+    const warmQuery: WarmQuery = await startup({ options });
+    const result = warmQuery.query("hi");
+
+    for await (const msg of result) {
+      if (abortController.signal.aborted) break;
+
+      if (
+        msg.type === "system" &&
+        (msg as Record<string, unknown>).subtype === "init"
+      ) {
+        const raw = msg as Record<string, unknown>;
+        const simplifiedNames = Array.isArray(raw.slash_commands)
+          ? (raw.slash_commands as string[])
+          : [];
+        let slashCommands: ReadonlyArray<SlashCommandInfo>;
+        try {
+          const commands = await result.supportedCommands();
+          slashCommands = commands.map((command) => ({
+            name: command.name,
+            description: command.description ?? "",
+            argumentHint: command.argumentHint || undefined,
+            aliases:
+              command.aliases && command.aliases.length > 0
+                ? command.aliases
+                : undefined,
+          }));
+        } catch {
+          slashCommands = simplifiedNames.map((name) => ({
+            name,
+            description: "",
+          }));
+        }
+
+        emit({
+          evt: "system_init",
+          id,
+          tools: Array.isArray(raw.tools) ? (raw.tools as string[]) : [],
+          mcpServers: Array.isArray(raw.mcp_servers)
+            ? (raw.mcp_servers as Array<{ name: string; status: string }>)
+            : [],
+          model: typeof raw.model === "string" ? raw.model : cmd.model,
+          fastModeState:
+            typeof raw.fast_mode_state === "string"
+              ? raw.fast_mode_state
+              : undefined,
+          slashCommands,
+        });
+        abortController.abort();
+        break;
+      }
+
+      if (msg.type === "result") break;
+    }
+
+    emit({ evt: "done", id });
+  } catch {
+    emit({ evt: "done", id });
+  } finally {
+    activeAbortControllers.delete(id);
+    restoreCredentials(savedEnv);
+    releaseCredentialLock();
+  }
 }
 
 // ---------------------------------------------------------------------------
