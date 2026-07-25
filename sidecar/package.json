@@ -22,6 +22,7 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.198",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "openai": "^6.21.0",
     "zod": "^4.0.0"
@@ -31,6 +32,10 @@
     "body-parser": "2.3.0",
     "fast-uri": "4.1.1",
     "hono": "4.12.32"
+  },
+  "binaryVersions": {
+    "_comment": "Claude is derived from dependencies[\"@anthropic-ai/claude-agent-sdk\"]; Codex uses this explicit pin.",
+    "codex": "0.144.4"
   },
   "devDependencies": {
     "@types/node": "^25.2.2",
