@@ -4110,8 +4110,15 @@ export function buildCodexCommunityConfigArgs(): string[] {
 
 export function buildCodexProviderSpawnArgs(
   isOAuthAuth: boolean,
+  baseUrl?: string,
 ): string[] {
   const args = ["-c", 'model_providers.OpenAI.name="OpenAI"'];
+  if (baseUrl) {
+    args.push(
+      "-c",
+      `model_providers.OpenAI.base_url=${tomlString(validateCodexBaseUrl(baseUrl))}`,
+    );
+  }
   if (!isOAuthAuth) {
     args.push(
       "-c",
@@ -4376,6 +4383,18 @@ async function _spawnAndInitializeRpcInner(params: RpcInitParams): Promise<RpcSe
     tempConfigPath,
     stripCodexMcpSectionsForRuntime(sanitizedConfig ?? ""),
   );
+
+  // Match the formal build: Codex reads the provider endpoint from its
+  // isolated config in addition to the OPENAI_BASE_URL environment variable.
+  if (resolvedBaseUrl) {
+    const existing = readFileSync(tempConfigPath, "utf-8").replace(/\r/g, "");
+    writePrivateCodexFile(
+      tempConfigPath,
+      buildCodexBaseUrlToml(resolvedBaseUrl) + existing,
+    );
+    log(`[config] Injected openai_base_url into config.toml: ${resolvedBaseUrl}`);
+  }
+
   const mcpLauncherPath = join(
     tempCodexDir,
     MCP_RUNTIME_LAUNCHER_FILENAME,
@@ -4472,7 +4491,7 @@ async function _spawnAndInitializeRpcInner(params: RpcInitParams): Promise<RpcSe
   // Build spawn args
   const spawnArgs = [
     "app-server",
-    ...buildCodexProviderSpawnArgs(isOAuthAuth),
+    ...buildCodexProviderSpawnArgs(isOAuthAuth, resolvedBaseUrl),
   ];
   spawnArgs.push("-c", "features.enable_request_compression=false");
   spawnArgs.push(...buildCodexCommunityConfigArgs());

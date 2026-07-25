@@ -177,16 +177,29 @@ describe("community Codex startup configuration", () => {
     expect(result).toContain("conversation-id");
   });
 
-  it("never places a provider base URL or its credentials in argv", () => {
-    const sensitiveBaseUrl =
-      "https://user:password@example.test/v1?token=sentinel";
-    const args = buildCodexProviderSpawnArgs(false);
+  it("matches the formal build provider arguments for custom Base URLs", () => {
+    const baseUrl = "https://api.example.test/v1";
+    const args = buildCodexProviderSpawnArgs(false, baseUrl);
     const argv = args.join("\u0000");
 
-    expect(argv).not.toContain(sensitiveBaseUrl);
-    expect(argv).not.toContain("user:password");
-    expect(argv).not.toContain("token=sentinel");
+    expect(argv).toContain(
+      'model_providers.OpenAI.base_url="https://api.example.test/v1"',
+    );
     expect(argv).toContain("model_providers.OpenAI.env_key");
+    expect(argv).not.toContain("request-openai-key");
+
+    const oauthArgv = buildCodexProviderSpawnArgs(true, baseUrl).join("\u0000");
+    expect(oauthArgv).toContain(
+      'model_providers.OpenAI.base_url="https://api.example.test/v1"',
+    );
+    expect(oauthArgv).not.toContain("model_providers.OpenAI.env_key");
+
+    expect(() =>
+      buildCodexProviderSpawnArgs(
+        false,
+        "https://user:password@example.test/v1?token=sentinel",
+      ),
+    ).toThrow("must not include credentials");
   });
 
   it("validates and safely serializes provider base URLs", () => {
