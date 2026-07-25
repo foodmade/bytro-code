@@ -629,4 +629,19 @@ for (const privateModelSelectorState of [
   );
 }
 
+const notchOverlay = readText("src/components/notch/notch-overlay.tsx");
+for (const providerIconElement of [
+  'import { PLATFORM_ICONS } from "@/assets/providers"',
+  "return PLATFORM_ICONS[p] ?? null",
+  "const icon = providerIcon(provider)",
+  "src={icon}",
+  "draggable={false}",
+]) {
+  requireIncludes(
+    notchOverlay,
+    providerIconElement,
+    `Notch provider icon rendering is missing: ${providerIconElement}`,
+  );
+}
+
 process.stdout.write("Community Tauri configuration is valid.\n");

@@ -30,6 +30,7 @@ import {
   type NotchState,
   type NotchProvider,
 } from "@/lib/notch-bridge";
+import { PLATFORM_ICONS } from "@/assets/providers";
 import { NotchTokenWave } from "@/components/notch/notch-token-wave";
 
 // 灵动岛 · 真正的 spring morph 动效 + 真实状态绑定
@@ -93,6 +94,10 @@ function providerLabel(p: NotchProvider): string {
   return PROVIDER_LABEL[p as string] ?? String(p);
 }
 
+function providerIcon(p: NotchProvider): string | null {
+  return PLATFORM_ICONS[p] ?? null;
+}
+
 function stateProvider(state: NotchState): NotchProvider | null {
   if (
     state.kind === "streaming" ||
@@ -126,28 +131,52 @@ function ProviderLogo({
   accent: { primary: string; glow: string };
   size: number;
 }) {
+  const icon = providerIcon(provider);
   const label = providerLabel(provider);
+  if (!icon) {
+    return (
+      <span
+        aria-label={label}
+        title={label}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          background: accent.primary,
+          boxShadow: `0 0 8px ${accent.glow}`,
+          flex: "0 0 auto",
+        }}
+      />
+    );
+  }
   return (
     <span
       aria-label={label}
       title={label}
       style={{
-        width: size,
-        height: size,
+        width: size + 4,
+        height: size + 4,
         borderRadius: "50%",
-        background: accent.primary,
+        background: "rgba(255,255,255,0.1)",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#fff",
-        fontSize: Math.max(9, Math.round(size * 0.48)),
-        fontWeight: 700,
-        lineHeight: 1,
-        boxShadow: `0 0 8px ${accent.glow}`,
+        boxShadow: `0 0 10px ${accent.glow}`,
         flex: "0 0 auto",
       }}
     >
-      {label.slice(0, 1).toUpperCase()}
+      <img
+        src={icon}
+        alt=""
+        draggable={false}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          display: "block",
+          objectFit: "cover",
+        }}
+      />
     </span>
   );
 }
