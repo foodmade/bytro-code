@@ -1,0 +1,17 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="14" fill="#131314"/>
+  <path d="M32 8C32 8 40.5 20 40.5 32C40.5 44 32 56 32 56C32 56 23.5 44 23.5 32C23.5 20 32 8 32 8Z" fill="url(#gemini_g1)"/>
+  <path d="M8 32C8 32 20 23.5 32 23.5C44 23.5 56 32 56 32C56 32 44 40.5 32 40.5C20 40.5 8 32 8 32Z" fill="url(#gemini_g2)"/>
+  <defs>
+    <linearGradient id="gemini_g1" x1="32" y1="8" x2="32" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4285F4"/>
+      <stop offset="0.5" stop-color="#9B72CB"/>
+      <stop offset="1" stop-color="#D96570"/>
+    </linearGradient>
+    <linearGradient id="gemini_g2" x1="8" y1="32" x2="56" y2="32" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4285F4"/>
+      <stop offset="0.5" stop-color="#9B72CB"/>
+      <stop offset="1" stop-color="#D96570"/>
+    </linearGradient>
+  </defs>
+</svg>

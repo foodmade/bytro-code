@@ -7,8 +7,16 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, Check, ChevronDown, Search, Settings } from "lucide-react";
+import {
+  AlertTriangle,
+  Brain,
+  Check,
+  Search,
+  Settings,
+  WandSparkles,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { PLATFORM_ICONS } from "@/assets/providers";
 import {
   DISABLED_PLATFORMS,
   PLATFORM_REGISTRY,
@@ -18,10 +26,12 @@ import {
   getDisplayModelsForPlatform,
   hasActiveProfileCredentials,
   ollamaLocalModelsToEntries,
+  supportsCodexMaxReasoning,
   type PlatformId,
 } from "@/lib/platform-config";
 import { resolveStoredModel } from "@/lib/pane-model";
-import { cn } from "@/lib/utils";
+import { isPeakReasoningVisualActive } from "@/lib/reasoning-visuals";
+import { cn, collapseStyle } from "@/lib/utils";
 import {
   useAppStore,
   useConversationStore,
@@ -31,15 +41,29 @@ import {
 } from "@/stores";
 import { useOllamaStore } from "@/stores/ollama-store";
 import { useRemoteModelsStore } from "@/stores/remote-models-store";
+import type { ModelOptionsPlatformId } from "@/stores/settings-store";
+import { EffortTimelinePopover } from "./effort-timeline";
 
 const DROPDOWN_WIDTH = 520;
 const DROPDOWN_HEIGHT = 360;
 const VIEWPORT_GUTTER = 12;
 
+interface TriggerModeSummary {
+  readonly levelLabel: string;
+  readonly levelShortLabel: string;
+  readonly modeLabel: string;
+  readonly peakVisualActive: boolean;
+  readonly title: string;
+}
+
 interface ModelSelectorProps {
   readonly compact?: boolean;
   readonly conversationId?: string | null;
   readonly paneId?: string;
+}
+
+function isModelOptionsPlatformId(value: PlatformId): value is ModelOptionsPlatformId {
+  return value === "claude" || value === "codex";
 }
 
 function positionDropdown(anchor: DOMRect) {
@@ -63,14 +87,18 @@ export const ModelSelector = memo(function ModelSelector({
 }: ModelSelectorProps = {}) {
   const { t } = useTranslation();
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const effortBtnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [effortOpen, setEffortOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [previewPlatformId, setPreviewPlatformId] = useState<PlatformId | null>(null);
   const [position, setPosition] = useState<ReturnType<typeof positionDropdown> | null>(null);
 
   const activePlatformId = useSettingsStore((state) => state.activePlatformId);
   const platforms = useSettingsStore((state) => state.platforms);
+  const platformModelOptions = useSettingsStore((state) => state.platformModelOptions);
+  const reasoningLevel = useSettingsStore((state) => state.reasoningLevel);
   const setActivePlatform = useSettingsStore((state) => state.setActivePlatform);
   const setActiveModel = useSettingsStore((state) => state.setActiveModel);
   const openSettings = useAppStore((state) => state.openSettings);
@@ -164,6 +192,53 @@ export const ModelSelector = memo(function ModelSelector({
   const triggerLabel = requiresLocalSelection
     ? t("modelSelector.selectLocalModel", "Select local model")
     : activeModel?.label ?? effectiveModelId;
+  const triggerOptionsPlatformId =
+    !requiresLocalSelection && isModelOptionsPlatformId(effectivePlatformId)
+      ? effectivePlatformId
+      : null;
+  const triggerModeSummary = useMemo<TriggerModeSummary | null>(() => {
+    if (!triggerOptionsPlatformId) return null;
+
+    const ultracodeActive =
+      triggerOptionsPlatformId === "claude" && platformModelOptions.claude.ultracodeEnabled;
+    const peakVisualActive = isPeakReasoningVisualActive({
+      sdk: triggerOptionsPlatformId,
+      modelId: effectiveModelId,
+      reasoningLevel,
+      ultracodeEnabled: platformModelOptions.claude.ultracodeEnabled,
+    });
+    const triggerReasoningLevel =
+      triggerOptionsPlatformId === "codex" &&
+      reasoningLevel === "max" &&
+      !supportsCodexMaxReasoning(effectiveModelId)
+        ? "xhigh"
+        : reasoningLevel;
+    const modeLabel =
+      triggerOptionsPlatformId === "codex"
+        ? t("modelSelector.trigger.reasoning")
+        : t("modelSelector.trigger.effort");
+    const levelLabel = ultracodeActive
+      ? t("modelSelector.options.ultracode")
+      : t(`chat.preferences.thinkingLevels.${triggerReasoningLevel}`);
+    const levelShortLabel = ultracodeActive
+      ? t("modelSelector.trigger.levelShort.ultracode")
+      : t(`modelSelector.trigger.levelShort.${triggerReasoningLevel}`);
+
+    return {
+      levelLabel,
+      levelShortLabel,
+      modeLabel,
+      peakVisualActive,
+      title: `${triggerLabel} · ${modeLabel} ${levelLabel}`,
+    };
+  }, [
+    effectiveModelId,
+    platformModelOptions.claude.ultracodeEnabled,
+    reasoningLevel,
+    t,
+    triggerLabel,
+    triggerOptionsPlatformId,
+  ]);
 
   const updatePosition = useCallback(() => {
     const anchor = triggerRef.current?.getBoundingClientRect();
@@ -248,44 +323,106 @@ export const ModelSelector = memo(function ModelSelector({
 
   return (
     <div className="relative min-w-0">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => {
-          setOpen((value) => !value);
-          setPreviewPlatformId(effectivePlatformId);
-        }}
-        className={cn(
-          "flex min-w-0 items-center gap-2 rounded-lg border transition-colors hover:bg-border-light",
-          compact ? "h-8 px-2" : "h-9 px-3",
-        )}
+      <div
+        className="flex min-w-0 max-w-[240px] items-center overflow-hidden rounded"
         style={{
-          borderColor: requiresLocalSelection
-            ? "var(--color-accent-warning)"
-            : "var(--color-border)",
-          backgroundColor: "var(--color-surface)",
+          backgroundColor: open || effortOpen ? "var(--color-border-light)" : undefined,
         }}
-        aria-expanded={open}
-        aria-haspopup="dialog"
       >
-        {requiresLocalSelection ? (
-          <AlertTriangle size={14} className="shrink-0 text-amber-500" />
-        ) : (
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={() => {
+            setEffortOpen(false);
+            setOpen((value) => !value);
+            setPreviewPlatformId(effectivePlatformId);
+          }}
+          className="flex min-w-0 items-center gap-1.5 overflow-hidden rounded-l px-1.5 py-1.5 transition-colors hover:bg-border-light"
+          title={triggerModeSummary?.title ?? triggerLabel}
+          aria-label={triggerModeSummary?.title ?? triggerLabel}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+        >
+          {requiresLocalSelection ? (
+            <AlertTriangle size={12} className="shrink-0 text-amber-500" aria-hidden />
+          ) : PLATFORM_ICONS[effectivePlatformId] ? (
+            <img
+              src={PLATFORM_ICONS[effectivePlatformId]}
+              alt=""
+              className="h-3 w-3 shrink-0 object-contain"
+            />
+          ) : (
+            <span
+              className="flex h-3 w-3 shrink-0 items-center justify-center rounded-sm text-[9px] font-bold"
+              style={{ color: activeMeta.color }}
+            >
+              {activeMeta.letter}
+            </span>
+          )}
           <span
-            className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold"
-            style={{ color: activeMeta.color }}
+            className="min-w-0 truncate font-sans text-[11px] font-medium text-foreground"
+            style={compact ? collapseStyle(true) : undefined}
           >
-            {activeMeta.letter}
+            {triggerLabel}
           </span>
+        </button>
+
+        {triggerModeSummary && (
+          <button
+            ref={effortBtnRef}
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setEffortOpen((value) => !value);
+            }}
+            className={cn(
+              "flex shrink-0 items-center gap-1 rounded-r px-1.5 py-1.5 font-sans text-[11px] font-semibold leading-none transition-colors hover:bg-border-light",
+              compact && "gap-0.5",
+              triggerModeSummary.peakVisualActive && "effort-trigger--ultracode",
+            )}
+            style={{ color: "var(--color-text-tertiary)" }}
+            title={`${triggerModeSummary.modeLabel} ${triggerModeSummary.levelLabel}`}
+            aria-label={`${triggerModeSummary.modeLabel} ${triggerModeSummary.levelLabel}`}
+            aria-expanded={effortOpen}
+            aria-haspopup="dialog"
+          >
+            {triggerModeSummary.peakVisualActive ? (
+              <WandSparkles
+                size={12}
+                strokeWidth={1.8}
+                className="effort-timeline-spark shrink-0"
+                style={{ color: "var(--color-accent-purple)" }}
+                aria-hidden
+              />
+            ) : (
+              <Brain
+                size={12}
+                strokeWidth={1.8}
+                className="shrink-0"
+                style={{ color: "var(--color-text-placeholder)" }}
+                aria-hidden
+              />
+            )}
+            <span
+              className={cn(
+                "whitespace-nowrap",
+                triggerModeSummary.peakVisualActive && "ultracode-gradient-text",
+              )}
+            >
+              {compact ? triggerModeSummary.levelShortLabel : triggerModeSummary.levelLabel}
+            </span>
+          </button>
         )}
-        <span className="min-w-0 truncate text-[12px] font-medium text-foreground">
-          {triggerLabel}
-        </span>
-        <ChevronDown
-          size={13}
-          className={cn("shrink-0 text-muted transition-transform", open && "rotate-180")}
+      </div>
+
+      {effortOpen && triggerOptionsPlatformId && (
+        <EffortTimelinePopover
+          platformId={triggerOptionsPlatformId}
+          modelId={effectiveModelId}
+          anchorEl={effortBtnRef.current}
+          onClose={() => setEffortOpen(false)}
         />
-      </button>
+      )}
 
       {open && position && typeof document !== "undefined" &&
         createPortal(

@@ -599,4 +599,31 @@ requireIncludes(
   "Codex session deletion root has no Bytro-owned regression test",
 );
 
+const modelSelector = readText("src/components/chat/model-selector.tsx");
+for (const formalTriggerElement of [
+  "PLATFORM_ICONS",
+  "EffortTimelinePopover",
+  "triggerModeSummary",
+  "effortBtnRef",
+  'className="flex min-w-0 max-w-[240px] items-center overflow-hidden rounded"',
+]) {
+  requireIncludes(
+    modelSelector,
+    formalTriggerElement,
+    `Formal model trigger structure is missing: ${formalTriggerElement}`,
+  );
+}
+for (const privateModelSelectorState of [
+  "useAuthStore",
+  "OfficialModelsConfig",
+  "OFFICIAL_PLATFORM_ID",
+  "bytroIcon",
+]) {
+  rejectIncludes(
+    modelSelector,
+    privateModelSelectorState,
+    `Private model selector state was restored: ${privateModelSelectorState}`,
+  );
+}
+
 process.stdout.write("Community Tauri configuration is valid.\n");

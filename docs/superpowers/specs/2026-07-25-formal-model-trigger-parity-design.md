@@ -15,21 +15,26 @@ The highlighted control must present:
 
 ## Scope
 
-The change is limited to
-`src/components/chat/model-selector.tsx`.
+The behavioral change is limited to
+`src/components/chat/model-selector.tsx`. Provider-identification assets used
+by Community Edition's supported platforms may be copied from the formal
+edition into `src/assets/providers/`.
 
 The existing Community Edition model catalog, local-profile filtering, Ollama
 loading, conversation/pane-scoped model persistence, settings navigation, and
 model dropdown remain authoritative.
 
-The existing formal-edition assets and shared components already present in
-Community Edition may be reused:
+The existing formal-edition shared components and provider-identification
+assets may be reused:
 
 - `PLATFORM_ICONS`;
 - `EffortTimelinePopover`;
 - `isPeakReasoningVisualActive`;
 - `supportsCodexMaxReasoning`; and
 - the existing effort timeline CSS.
+
+The provider marks are used only to identify compatibility and remain covered
+by `THIRD_PARTY_NOTICES.md`. Bytro official-model assets are not copied.
 
 ## Trigger behavior
 
@@ -54,6 +59,7 @@ This change must not import or restore:
 - `useAuthStore`;
 - Bytro account or official-model state;
 - `OfficialModelsConfig` or official-model branches;
+- Bytro official-model icons or private service assets;
 - shared/private provider credentials;
 - cloud usage or billing behavior; or
 - automatic remote model fetching.
