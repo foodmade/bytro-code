@@ -52,6 +52,17 @@ The model label continues to come from the active Community Edition profile and
 model list. A profile requiring an explicit local selection keeps an accessible
 warning title and label rather than silently selecting a model.
 
+## Dropdown platform icons
+
+The model dropdown's platform list uses the same provider-identification assets
+as the trigger. Each platform row renders a 26 by 26 pixel rounded badge with a
+subtle background derived from the platform color and a centered 16 by 16 pixel
+provider icon. If no provider asset exists, the badge falls back to the
+platform's configured letter and color.
+
+This is a presentation-only change. Platform ordering, availability, hover and
+selection behavior, active-row styling, and model filtering remain unchanged.
+
 ## Explicit exclusions
 
 This change must not import or restore:
@@ -76,3 +87,5 @@ The permission selector remains unchanged. Differences such as “自动编辑�
   official-model state.
 - The rendered trigger has no standalone bordered surface and exposes separate
   model and effort buttons for Claude/Codex.
+- Every supported dropdown platform uses its provider icon inside the formal
+  edition's 26 by 26 pixel badge, with a letter fallback for missing assets.
