@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { PLATFORM_ICONS } from "@/assets/providers";
+import { useIsLightTheme } from "@/hooks";
 import {
   DISABLED_PLATFORMS,
   PLATFORM_REGISTRY,
@@ -86,6 +87,7 @@ export const ModelSelector = memo(function ModelSelector({
   paneId,
 }: ModelSelectorProps = {}) {
   const { t } = useTranslation();
+  const isLight = useIsLightTheme();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const effortBtnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -451,6 +453,7 @@ export const ModelSelector = memo(function ModelSelector({
               <div className="flex-1 overflow-y-auto">
                 {visiblePlatforms.map((platformId) => {
                   const meta = PLATFORM_REGISTRY[platformId];
+                  const platformIcon = PLATFORM_ICONS[platformId];
                   const selected = panelPlatformId === platformId;
                   return (
                     <button
@@ -470,10 +473,23 @@ export const ModelSelector = memo(function ModelSelector({
                       }}
                     >
                       <span
-                        className="flex h-5 w-5 shrink-0 items-center justify-center text-xs font-bold"
-                        style={{ color: meta.color }}
+                        className="flex h-[26px] w-[26px] shrink-0 items-center justify-center overflow-hidden rounded-md"
+                        style={{ backgroundColor: `${meta.color}${isLight ? "15" : "26"}` }}
                       >
-                        {meta.letter}
+                        {platformIcon ? (
+                          <img
+                            src={platformIcon}
+                            alt=""
+                            className="h-4 w-4 object-contain"
+                          />
+                        ) : (
+                          <span
+                            className="font-sans text-[12px] font-bold"
+                            style={{ color: meta.color }}
+                          >
+                            {meta.letter}
+                          </span>
+                        )}
                       </span>
                       <span className="truncate text-[12px] font-medium text-foreground">
                         {meta.displayName}

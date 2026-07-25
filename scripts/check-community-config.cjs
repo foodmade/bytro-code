@@ -606,6 +606,9 @@ for (const formalTriggerElement of [
   "triggerModeSummary",
   "effortBtnRef",
   'className="flex min-w-0 max-w-[240px] items-center overflow-hidden rounded"',
+  "const platformIcon = PLATFORM_ICONS[platformId]",
+  'className="flex h-[26px] w-[26px] shrink-0 items-center justify-center overflow-hidden rounded-md"',
+  'className="h-4 w-4 object-contain"',
 ]) {
   requireIncludes(
     modelSelector,
