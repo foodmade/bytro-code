@@ -16,7 +16,8 @@ Claude Code 或 Codex 的机器上，会话启动会失败并显示：
 ## 目标
 
 - 在应用启动后自动检查 Claude 和 Codex CLI。
-- 缺失时使用本机 Node.js/npm 安装固定版本的官方平台包。
+- 缺失时读取 `sidecar/package.json` 中与正式版相同的两个版本定义，
+  再使用本机 Node.js/npm 安装当前系统对应的 SDK 平台包。
 - 安装到 Bytro Community Edition 私有目录，不写全局 npm 目录。
 - 会话入口在后台安装尚未完成或失败时执行即时兜底。
 - Claude/Codex 会话、预热及认证流程始终获得已验证的绝对可执行路径。
@@ -33,23 +34,32 @@ Claude Code 或 Codex 的机器上，会话启动会失败并显示：
 
 ## 版本来源
 
-`sidecar/package.json` 是唯一版本来源：
+`sidecar/package.json` 与正式版保持相同的两个唯一版本来源：
 
 ```json
 {
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.198"
+  },
   "binaryVersions": {
-    "claudeAgentSdk": "0.3.198",
     "codex": "0.144.4"
   }
 }
 ```
 
-`src-tauri/build.rs` 在编译时读取这两个值并生成：
+- Claude SDK 版本读取
+  `dependencies["@anthropic-ai/claude-agent-sdk"]`。
+- Codex SDK 版本读取 `binaryVersions.codex`。
+
+不得增加新的 Claude 版本字段，也不得在 Rust 或 TypeScript 源码中重复硬编码
+版本号。正式版的二进制发布和社区版的本地 SDK 安装由同一组版本定义驱动。
+
+`src-tauri/build.rs` 沿用正式版逻辑，在编译时读取这两个值并生成：
 
 - `CLAUDE_BINARY_VERSION`
 - `CODEX_BINARY_VERSION`
 
-缺少任何版本字段时构建直接失败，避免运行时静默选择其他版本。
+缺少 Claude 依赖项或 Codex 版本字段时构建直接失败，避免运行时静默选择其他版本。
 
 ## 安装布局
 
@@ -76,7 +86,8 @@ Claude Code 或 Codex 的机器上，会话启动会失败并显示：
 
 ## 平台包映射
 
-Claude 使用显式平台包：
+Claude 使用 `dependencies["@anthropic-ai/claude-agent-sdk"]` 的版本值
+推导显式平台包：
 
 | 系统 | 架构 | npm 包 |
 | --- | --- | --- |
@@ -91,7 +102,7 @@ Claude 使用显式平台包：
 
 Claude 可执行文件位于平台包根目录中的 `claude` 或 `claude.exe`。
 
-Codex 使用上游平台版本：
+Codex 使用 `binaryVersions.codex` 的版本值推导上游平台版本：
 
 | 系统 | 架构 | npm 包 |
 | --- | --- | --- |
@@ -110,7 +121,7 @@ Codex 可执行文件从平台包的 `vendor/<target-triple>/codex/` 或
 
 新增社区版 Provider CLI 管理器，Rust 侧统一负责：
 
-- 读取编译期固定版本。
+- 读取由 `sidecar/package.json` 两个正式版本来源生成的编译期版本。
 - 解析当前平台包和预期可执行文件。
 - 优先验证用户显式配置的绝对路径。
 - 其次验证应用私有目录中的固定版本。
@@ -124,7 +135,8 @@ Codex 可执行文件从平台包的 `vendor/<target-triple>/codex/` 或
 - 向 `check_cli_tools` 暴露应用私有安装状态和固定版本。
 
 npm 必须通过 NodeRuntimeManager 返回的本机绝对路径启动。命令参数作为独立
-参数传递，不拼接 shell 字符串。包名和版本只来自编译期闭集。
+参数传递，不拼接 shell 字符串。包名来自平台映射闭集，版本只来自
+`dependencies["@anthropic-ai/claude-agent-sdk"]` 和 `binaryVersions.codex`。
 
 ## 启动和即时兜底
 
@@ -199,7 +211,8 @@ Provider 的会话；失败的一侧在首次使用时重试。
 - 所有支持平台映射到正确包名和可执行路径。
 - 不支持的系统或架构明确失败。
 - 安装根目录和临时目录路径边界校验。
-- 固定版本解析和缺失版本构建失败。
+- 从 `dependencies["@anthropic-ai/claude-agent-sdk"]` 和
+  `binaryVersions.codex` 解析版本；任一缺失时构建失败。
 - 用户显式路径、应用私有路径、PATH、自动安装的优先级。
 - 并发调用只执行一次安装。
 - 半安装目录不会作为有效 CLI。
