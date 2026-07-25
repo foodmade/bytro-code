@@ -180,7 +180,7 @@ export async function handleTeamsQuery(
   });
 
   try {
-    const claudePath = findClaudeCodePath();
+    const claudePath = findClaudeCodePath(cmd.claudeBinaryPath);
     if (!claudePath) {
       console.error("[teams-handler] Claude Code was not found on PATH or CLAUDE_CLI_PATH");
       emit({ evt: "teams_error", id, error: "Claude Code is not installed." });

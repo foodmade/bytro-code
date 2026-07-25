@@ -22,6 +22,7 @@ mod outputs;
 mod port_monitor;
 mod preview;
 mod project_scripts;
+mod provider_cli;
 mod provider_readonly;
 mod pty;
 mod sidecar;
@@ -531,6 +532,7 @@ pub fn run() {
         .manage(memory::db::MemoryDb::new().expect("Failed to initialize memory database"))
         .manage(sidecar::SidecarManager::new())
         .manage(node_runtime::NodeRuntimeManager::new())
+        .manage(provider_cli::ProviderCliManager::new())
         .manage(teams::TeamsWatcherState::new())
         .manage(voice::VoiceManager::new())
         .manage(oauth::OAuthManager::new())
@@ -795,6 +797,37 @@ pub fn run() {
             if let Err(e) = bytro_home::init() {
                 eprintln!("[bytro_home] Initialization failed: {}", e);
             }
+
+            // Community Edition installs the pinned provider SDK platform
+            // packages from npm into ~/.bytro-community/cli. Startup is
+            // best-effort; every real provider entry point also awaits the
+            // same manager, so an early network failure remains retryable.
+            let provider_cli_handle = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                if node_runtime::detect_node_runtime_internal(&provider_cli_handle)
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
+                let claude = provider_cli::ensure_provider_cli(
+                    &provider_cli_handle,
+                    provider_cli::ProviderCli::Claude,
+                    None,
+                );
+                let codex = provider_cli::ensure_provider_cli(
+                    &provider_cli_handle,
+                    provider_cli::ProviderCli::Codex,
+                    None,
+                );
+                let (claude_result, codex_result) = tokio::join!(claude, codex);
+                if let Err(error) = claude_result {
+                    log::warn!("[provider-cli] Claude startup preparation failed: {error}");
+                }
+                if let Err(error) = codex_result {
+                    log::warn!("[provider-cli] Codex startup preparation failed: {error}");
+                }
+            });
 
             // Register the initial "main" window in the WindowManager so that
             // single-instance focus and event routing work correctly.

@@ -480,10 +480,15 @@ export function truncateMessages<T extends { content: string }>(
 let cachedClaudePath: string | undefined;
 
 /**
- * Resolve Claude Code from `CLAUDE_CLI_PATH`, then the user's system PATH.
- * The optional argument is retained for wire compatibility but is ignored.
+ * Resolve Claude Code from the Rust-injected managed path first, then
+ * `CLAUDE_CLI_PATH`, then the user's system PATH.
  */
-export function findClaudeCodePath(_injectedPath?: string): string | undefined {
+export function findClaudeCodePath(injectedPath?: string): string | undefined {
+  if (injectedPath && existsSync(injectedPath)) {
+    cachedClaudePath = injectedPath;
+    return injectedPath;
+  }
+
   const configuredPath = process.env.CLAUDE_CLI_PATH?.trim();
   if (configuredPath && existsSync(configuredPath)) {
     cachedClaudePath = configuredPath;

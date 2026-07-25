@@ -380,12 +380,13 @@ pub async fn detect_node_runtime_internal(app: &AppHandle) -> Result<NodeRuntime
     let manager = app.state::<NodeRuntimeManager>();
 
     // Already ready → return immediately
-    {
+    let already_ready = {
         let state = manager.lock_state();
-        if matches!(state.status, NodeRuntimeStatus::Ready { .. }) {
-            log::info!("[node-runtime] already ready, returning cached state");
-            return Ok(manager.get_info());
-        }
+        matches!(state.status, NodeRuntimeStatus::Ready { .. })
+    };
+    if already_ready {
+        log::info!("[node-runtime] already ready, returning cached state");
+        return Ok(manager.get_info());
     }
 
     manager.set_status(NodeRuntimeStatus::Checking, app);

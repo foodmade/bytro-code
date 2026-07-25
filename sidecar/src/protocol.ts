@@ -114,6 +114,10 @@ export interface QueryCommand {
   readonly dimensionPrompts?: Readonly<Record<string, string>>;
   /** Ollama num_ctx override. */
   readonly numCtx?: number;
+  /** Absolute Claude executable selected by the Community runtime installer. */
+  readonly claudeBinaryPath?: string;
+  /** Absolute Codex executable selected by the Community runtime installer. */
+  readonly codexBinaryPath?: string;
   /** Slash-command metadata routed through to the handler. Codex maps native
    *  commands like /compact and /status to App Server RPCs; other agents
    *  ignore this field. */
@@ -172,6 +176,8 @@ export interface InitSessionCommand {
   readonly mcpServers?: Readonly<Record<string, McpServerConfig>>;
   readonly ultracode?: boolean;
   readonly fastMode?: boolean;
+  readonly claudeBinaryPath?: string;
+  readonly codexBinaryPath?: string;
 }
 
 // ---- Teams Commands (Claude CLI multi-agent) ----
@@ -200,6 +206,7 @@ export interface TeamsQueryCommand {
   readonly model?: string;
   readonly mcpServers?: Readonly<Record<string, McpServerConfig>>;
   readonly responseLanguage?: string;
+  readonly claudeBinaryPath: string;
 }
 
 // ---- Legacy Orchestration Commands (deprecated) ----
@@ -240,6 +247,7 @@ export interface CodexAuthStartCommand {
   readonly cmd: "codex_auth_start";
   readonly id: string;
   readonly profileId: string;
+  readonly codexBinaryPath: string;
 }
 
 export interface CodexAuthReadCommand {
@@ -247,6 +255,7 @@ export interface CodexAuthReadCommand {
   readonly id: string;
   readonly profileId: string;
   readonly refreshToken?: boolean;
+  readonly codexBinaryPath: string;
 }
 
 export interface CodexAuthCancelCommand {
@@ -254,12 +263,14 @@ export interface CodexAuthCancelCommand {
   readonly id: string;
   readonly profileId: string;
   readonly loginId: string;
+  readonly codexBinaryPath: string;
 }
 
 export interface CodexAuthSignOutCommand {
   readonly cmd: "codex_auth_sign_out";
   readonly id: string;
   readonly profileId: string;
+  readonly codexBinaryPath: string;
 }
 
 export type SidecarCommand =

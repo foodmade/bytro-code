@@ -107,6 +107,12 @@ pub async fn stream_teams_chat(
     });
 
     super::chat::ensure_agent_proxy_reachable(proxy_url.as_deref()).await?;
+    let claude_binary_path = crate::provider_cli::ensure_provider_cli(
+        &app,
+        crate::provider_cli::ProviderCli::Claude,
+        proxy_url.as_deref(),
+    )
+    .await?;
 
     let mgr = app.state::<SidecarManager>();
     mgr.ensure_running(
@@ -179,6 +185,7 @@ pub async fn stream_teams_chat(
         model,
         mcp_servers,
         response_language,
+        claude_binary_path,
     };
 
     mgr.send_command(&cmd)?;

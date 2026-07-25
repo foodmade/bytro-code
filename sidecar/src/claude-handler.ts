@@ -2231,7 +2231,7 @@ export async function handleClaudeInit(
   activeAbortControllers.set(id, abortController);
 
   try {
-    const claudePath = findClaudeCodePath();
+    const claudePath = findClaudeCodePath(cmd.claudeBinaryPath);
     if (!claudePath) {
       emit({ evt: "done", id });
       return;
@@ -2601,7 +2601,7 @@ export async function handleClaudeQuery(
   replaceActivePromptChannel(id, currentPromptChannel);
 
   try {
-    const claudePath = findClaudeCodePath();
+    const claudePath = findClaudeCodePath(cmd.claudeBinaryPath);
     if (!claudePath) {
       emit({
         evt: "error",

@@ -306,6 +306,32 @@ pub(crate) async fn stream_chat_inner(
         return Err(error);
     }
 
+    let (claude_binary_path, codex_binary_path) = match agent_type.as_str() {
+        "claude" => (
+            Some(
+                crate::provider_cli::ensure_provider_cli(
+                    &app,
+                    crate::provider_cli::ProviderCli::Claude,
+                    proxy_url.as_deref(),
+                )
+                .await?,
+            ),
+            None,
+        ),
+        "codex" => (
+            None,
+            Some(
+                crate::provider_cli::ensure_provider_cli(
+                    &app,
+                    crate::provider_cli::ProviderCli::Codex,
+                    proxy_url.as_deref(),
+                )
+                .await?,
+            ),
+        ),
+        _ => (None, None),
+    };
+
     let mgr = app.state::<SidecarManager>();
     mgr.ensure_running(
         &resolved_api_key,
@@ -502,6 +528,8 @@ pub(crate) async fn stream_chat_inner(
         conversation_id,
         dimension_prompts,
         num_ctx,
+        codex_binary_path,
+        claude_binary_path,
         command_invocation,
         caveman_mode,
         fork_session,

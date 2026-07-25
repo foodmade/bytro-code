@@ -410,7 +410,13 @@ export function selectCodexBinaryCandidate(
     ?? candidates.find((candidate) => /\.(?:cmd|bat)$/i.test(candidate));
 }
 
-function findCodexBinaryPath(_overridePath?: string): string | undefined {
+function findCodexBinaryPath(overridePath?: string): string | undefined {
+  if (overridePath && existsSync(overridePath)) {
+    log(`[binary] Using injected Codex path: ${overridePath}`);
+    cachedCodexPath = overridePath;
+    return overridePath;
+  }
+
   const configuredPath = process.env.CODEX_CLI_PATH?.trim();
   if (configuredPath && existsSync(configuredPath)) {
     cachedCodexPath = configuredPath;
@@ -4064,6 +4070,7 @@ interface RpcInitParams {
   authMode?: AuthMode;
   profileId?: string;
   mcpServers?: Readonly<Record<string, unknown>>;
+  codexBinaryPath?: string;
   /** Default quality for the openai_images MCP tool — propagated as env var. */
   imageGenQuality?: string;
   /** Default size tier for the openai_images MCP tool — propagated as env var. */
@@ -4487,14 +4494,13 @@ async function _spawnAndInitializeRpcInner(params: RpcInitParams): Promise<RpcSe
 
   log("[codex-home] Isolated Codex config is ready");
 
-  const codexVersion = getCodexVersion();
-
-  const codexPath = findCodexBinaryPath();
+  const codexPath = findCodexBinaryPath(params.codexBinaryPath);
   if (!codexPath) {
     throw new Error(
       "Codex CLI is not installed. Install it locally, add it to PATH, or set CODEX_CLI_PATH.",
     );
   }
+  const codexVersion = probeCodexVersion(codexPath) ?? getCodexVersion();
 
   // Diagnostic: verify the binary file
   try {
@@ -4652,11 +4658,12 @@ function accountFromResponse(response: unknown): CodexAuthAccount {
   return { requiresOpenaiAuth };
 }
 
-async function spawnCodexAuthRpc(cmd: { profileId: string }): Promise<CodexAuthSetup> {
+async function spawnCodexAuthRpc(cmd: { profileId: string; codexBinaryPath?: string }): Promise<CodexAuthSetup> {
   const setup = await spawnAndInitializeRpc({
     apiKey: "",
     authMode: "oauth",
     profileId: cmd.profileId,
+    codexBinaryPath: cmd.codexBinaryPath,
   });
   return { rpc: setup.rpc, tempHome: setup.tempHome };
 }
@@ -5186,6 +5193,7 @@ export async function handleCodexInit(
       baseUrl: cmd.baseUrl,
       proxyUrl: cmd.proxyUrl,
       mcpServers: cmd.mcpServers,
+      codexBinaryPath: cmd.codexBinaryPath,
       authMode: cmd.authMode,
       profileId: cmd.profileId,
     });
@@ -5271,6 +5279,7 @@ async function createAppServerConnection(cmd: QueryCommand): Promise<AppServerSe
       baseUrl: cmd.baseUrl,
       proxyUrl: cmd.proxyUrl,
       mcpServers: cmd.mcpServers,
+      codexBinaryPath: cmd.codexBinaryPath,
       imageGenQuality: cmd.imageGenQuality,
       imageGenSize: cmd.imageGenSize,
       outputsDir: cmd.outputsDir,
@@ -5296,6 +5305,7 @@ async function createAppServerConnection(cmd: QueryCommand): Promise<AppServerSe
         baseUrl: cmd.baseUrl,
         proxyUrl: cmd.proxyUrl,
         mcpServers: cmd.mcpServers,
+        codexBinaryPath: cmd.codexBinaryPath,
         authMode: cmd.authMode,
         profileId: cmd.profileId,
         imageGenQuality: cmd.imageGenQuality,

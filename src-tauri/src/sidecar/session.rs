@@ -116,6 +116,32 @@ pub async fn init_session(
             .unwrap_or_else(|_| ".".to_string())
     });
 
+    let (claude_binary_path, codex_binary_path) = if is_codex {
+        (
+            None,
+            Some(
+                crate::provider_cli::ensure_provider_cli(
+                    &app,
+                    crate::provider_cli::ProviderCli::Codex,
+                    proxy_url.as_deref(),
+                )
+                .await?,
+            ),
+        )
+    } else {
+        (
+            Some(
+                crate::provider_cli::ensure_provider_cli(
+                    &app,
+                    crate::provider_cli::ProviderCli::Claude,
+                    proxy_url.as_deref(),
+                )
+                .await?,
+            ),
+            None,
+        )
+    };
+
     let mgr = app.state::<SidecarManager>();
     super::chat::ensure_agent_proxy_reachable(proxy_url.as_deref()).await?;
     mgr.ensure_running(
@@ -154,6 +180,8 @@ pub async fn init_session(
         mcp_servers,
         ultracode,
         fast_mode,
+        codex_binary_path,
+        claude_binary_path,
     };
 
     mgr.send_command(&cmd)?;

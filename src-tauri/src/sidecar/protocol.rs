@@ -111,6 +111,12 @@ pub(crate) enum SidecarCommand {
         #[serde(rename = "numCtx")]
         #[serde(skip_serializing_if = "Option::is_none")]
         num_ctx: Option<u32>,
+        #[serde(rename = "codexBinaryPath")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        codex_binary_path: Option<String>,
+        #[serde(rename = "claudeBinaryPath")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        claude_binary_path: Option<String>,
         /// Slash-command metadata. Codex inspects `canonicalName === "compact"`
         /// to route via `thread/compact/start` RPC; opaque to Rust otherwise.
         #[serde(rename = "commandInvocation")]
@@ -140,6 +146,8 @@ pub(crate) enum SidecarCommand {
         id: String,
         #[serde(rename = "profileId")]
         profile_id: String,
+        #[serde(rename = "codexBinaryPath")]
+        codex_binary_path: String,
     },
     CodexAuthRead {
         id: String,
@@ -148,6 +156,8 @@ pub(crate) enum SidecarCommand {
         #[serde(rename = "refreshToken")]
         #[serde(skip_serializing_if = "Option::is_none")]
         refresh_token: Option<bool>,
+        #[serde(rename = "codexBinaryPath")]
+        codex_binary_path: String,
     },
     CodexAuthCancel {
         id: String,
@@ -155,11 +165,15 @@ pub(crate) enum SidecarCommand {
         profile_id: String,
         #[serde(rename = "loginId")]
         login_id: String,
+        #[serde(rename = "codexBinaryPath")]
+        codex_binary_path: String,
     },
     CodexAuthSignOut {
         id: String,
         #[serde(rename = "profileId")]
         profile_id: String,
+        #[serde(rename = "codexBinaryPath")]
+        codex_binary_path: String,
     },
     UserInput {
         id: String,
@@ -207,6 +221,12 @@ pub(crate) enum SidecarCommand {
         #[serde(rename = "fastMode")]
         #[serde(skip_serializing_if = "Option::is_none")]
         fast_mode: Option<bool>,
+        #[serde(rename = "codexBinaryPath")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        codex_binary_path: Option<String>,
+        #[serde(rename = "claudeBinaryPath")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        claude_binary_path: Option<String>,
     },
     /// Kill a persistent (warm) CLI session by conversation ID.
     KillSession {
@@ -259,6 +279,8 @@ pub(crate) enum SidecarCommand {
         #[serde(rename = "responseLanguage")]
         #[serde(skip_serializing_if = "Option::is_none")]
         response_language: Option<String>,
+        #[serde(rename = "claudeBinaryPath")]
+        claude_binary_path: String,
     },
 }
 

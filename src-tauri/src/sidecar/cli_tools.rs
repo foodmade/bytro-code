@@ -424,6 +424,18 @@ pub async fn check_cli_tools(_app: AppHandle) -> Result<Vec<CliToolStatus>, Stri
                 path,
             }
         };
+        let provider_status = |provider: crate::provider_cli::ProviderCli, hint: &str| {
+            let resolved = crate::provider_cli::resolve_managed(provider)
+                .ok()
+                .flatten();
+            CliToolStatus {
+                name: format!("{} CLI", provider.name()),
+                installed: resolved.is_some(),
+                version: resolved.as_ref().and_then(|value| value.version.clone()),
+                install_command: hint.to_string(),
+                path: resolved.map(|value| value.path.to_string_lossy().to_string()),
+            }
+        };
 
         let node_binary = if cfg!(windows) { "node.exe" } else { "node" };
         let results = vec![
@@ -433,17 +445,13 @@ pub async fn check_cli_tools(_app: AppHandle) -> Result<Vec<CliToolStatus>, Stri
                 "BYTRO_NODE_PATH",
                 "Install Node.js locally, add it to PATH, or set BYTRO_NODE_PATH",
             ),
-            detect(
-                "Codex CLI",
-                "codex",
-                "CODEX_CLI_PATH",
-                "Install Codex locally, add it to PATH, or set CODEX_CLI_PATH",
+            provider_status(
+                crate::provider_cli::ProviderCli::Codex,
+                "Installed automatically from the pinned sidecar/package.json version",
             ),
-            detect(
-                "Claude CLI",
-                "claude",
-                "CLAUDE_CLI_PATH",
-                "Install Claude locally, add it to PATH, or set CLAUDE_CLI_PATH",
+            provider_status(
+                crate::provider_cli::ProviderCli::Claude,
+                "Installed automatically from the pinned sidecar/package.json version",
             ),
             detect(
                 "Gemini CLI",
@@ -542,11 +550,7 @@ pub async fn detect_cli_paths() -> Result<Vec<CliPathInfo>, String> {
     tokio::task::spawn_blocking(move || {
         extend_process_path_with_known_dirs();
 
-        let binaries = [
-            ("gemini", "gemini", "GEMINI_CLI_PATH"),
-            ("codex", "codex", "CODEX_CLI_PATH"),
-            ("claude", "claude", "CLAUDE_CLI_PATH"),
-        ];
+        let binaries = [("gemini", "gemini", "GEMINI_CLI_PATH")];
 
         let mut results: Vec<CliPathInfo> = binaries
             .iter()
@@ -561,6 +565,18 @@ pub async fn detect_cli_paths() -> Result<Vec<CliPathInfo>, String> {
                     .or_else(|| resolve_cli_path(binary)),
             })
             .collect();
+        for (name, provider) in [
+            ("codex", crate::provider_cli::ProviderCli::Codex),
+            ("claude", crate::provider_cli::ProviderCli::Claude),
+        ] {
+            results.push(CliPathInfo {
+                name: name.to_string(),
+                path: crate::provider_cli::resolve_managed(provider)
+                    .ok()
+                    .flatten()
+                    .map(|value| value.path.to_string_lossy().to_string()),
+            });
+        }
 
         // Node.js: detect via where/which
         let node_binary = if cfg!(target_os = "windows") {
