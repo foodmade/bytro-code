@@ -1,0 +1,234 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-sidecar:
+    name: Frontend and Sidecar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            sidecar/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Sidecar dependencies
+        run: npm --prefix sidecar ci
+
+      - name: Audit frontend and Sidecar dependencies
+        run: |
+          npm audit --audit-level=high
+          npm --prefix sidecar audit --audit-level=high
+
+      - name: Check Community Edition configuration
+        run: npm run check:community
+
+      - name: Lint public application sources
+        run: npm exec -- eslint src sidecar/src services/site-preview-worker/src --max-warnings 135
+
+      - name: Run frontend tests
+        run: npm test
+
+      - name: Run Sidecar tests
+        run: npm run test:sidecar
+
+      - name: Type-check Sidecar
+        run: npm run typecheck:sidecar
+
+      - name: Build Sidecar
+        run: npm run build:sidecar
+
+      - name: Build frontend
+        run: npm run build
+
+  worker:
+    name: Site Preview Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/site-preview-worker/package-lock.json
+
+      - name: Install Worker dependencies
+        run: npm --prefix services/site-preview-worker ci
+
+      - name: Audit Worker dependencies
+        run: npm --prefix services/site-preview-worker audit --audit-level=high
+
+      - name: Run Worker tests
+        run: npm --prefix services/site-preview-worker test
+
+      - name: Type-check Worker
+        run: npm --prefix services/site-preview-worker run typecheck
+
+      - name: Build Worker bundle
+        run: npm --prefix services/site-preview-worker run build:check
+
+  compliance:
+    name: Third-party compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install dependency trees for exact license metadata
+        run: |
+          npm ci --ignore-scripts
+          npm --prefix sidecar ci --ignore-scripts
+          npm --prefix services/site-preview-worker ci --ignore-scripts
+
+      - name: Generate and check dependency notices
+        run: >-
+          node scripts/check-third-party-compliance.cjs
+          --output "${{ runner.temp }}/bytro-compliance"
+
+      - name: Upload compliance artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: third-party-compliance
+          path: ${{ runner.temp }}/bytro-compliance
+          if-no-files-found: warn
+          retention-days: 14
+
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal \
+            --component rustfmt \
+            --component clippy
+          rustup default stable
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all --check
+
+      - name: Check Rust
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Test Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --all-targets --all-features
+
+      - name: Lint Rust
+        run: >-
+          cargo clippy
+          --manifest-path src-tauri/Cargo.toml
+          --locked
+          --all-targets
+          --all-features
+          --
+          -D warnings
+
+  rust-platform-smoke:
+    name: Rust platform smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Install Rust stable
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Check platform-specific Rust code
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets --all-features
+
+      - name: Run Rust library tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --lib --all-features
+
+  sidecar-platform-smoke:
+    name: Sidecar process tree (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: sidecar/package-lock.json
+
+      - name: Install Sidecar dependencies
+        run: npm --prefix sidecar ci
+
+      - name: Run real process-tree crash tests
+        run: npm --prefix sidecar test -- --run src/__tests__/process-tree-reaping.test.ts

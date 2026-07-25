@@ -1,0 +1,89 @@
+[package]
+name = "bytro-community"
+version = "0.1.0"
+description = "A local-first desktop workspace for user-configured AI coding agents"
+authors = ["misschendo and contributors"]
+license = "Apache-2.0"
+edition = "2021"
+
+[lib]
+name = "bytro_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.1", features = ["protocol-asset", "macos-private-api", "image-png", "tray-icon"] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-store = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-clipboard-manager = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+portable-pty = "0.8"
+notify = "6.1"
+tokio = { version = "1", features = ["rt-multi-thread", "process", "io-util", "fs"] }
+log = "0.4"
+env_logger = "0.11"
+dirs = "5"
+uuid = { version = "1", features = ["v4"] }
+reqwest = { version = "0.12", default-features = false, features = ["stream", "json", "socks", "blocking", "rustls-tls"] }
+futures-util = "0.3"
+rusqlite = { version = "0.32", features = ["bundled"] }
+git2 = { version = "0.19", features = ["vendored-libgit2", "vendored-openssl", "ssh"] }
+sha2 = "0.10"
+zip = { version = "2", default-features = false, features = ["deflate-miniz", "time"] }
+http = "1"
+axum = { version = "0.8", features = ["ws"] }
+tower-http = { version = "0.6", features = ["cors", "fs"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+base64 = "0.22"
+tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = "2"
+urlencoding = "2"
+rand = "0.8"
+url = "2"
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+bytes = "1"
+flate2 = "1"
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSURL", "NSError", "NSLocale", "NSArray"] }
+objc2-app-kit = { version = "0.3", features = ["NSAppearance", "NSApplication", "NSWindow", "NSResponder", "NSRunningApplication", "NSColor", "NSView", "NSScreen", "NSEvent", "block2"] }
+objc2-speech = { version = "0.3", features = ["SFSpeechRecognizer", "SFSpeechRecognitionRequest", "SFSpeechRecognitionResult", "SFSpeechRecognitionTask", "SFTranscription", "SFTranscriptionSegment", "block2"] }
+block2 = "0.6"
+tempfile = "3"
+raw-window-handle = "0.6"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+whisper-rs = "0.13"
+
+[target.'cfg(windows)'.dependencies]
+encoding_rs = "0.8"
+windows-sys = { version = "0.59", features = [
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_Networking_WinSock",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_Foundation",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_Threading",
+    "Win32_System_SystemServices",
+    "Win32_Storage_FileSystem",
+] }
+
+[features]
+default = []
+
+[profile.release]
+lto = "thin"
+strip = true
+opt-level = "s"
+codegen-units = 4
+panic = "abort"

@@ -1,0 +1,3 @@
+# Copy to .dev.vars for local Wrangler development.
+# Generate a random value; do not reuse a model-provider credential.
+UPLOAD_API_KEY=

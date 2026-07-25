@@ -1,0 +1,27 @@
+# Copy this file to wrangler.toml and replace every example value before
+# deploying. Do not commit a real account/domain configuration.
+
+name = "bytro-site-preview"
+main = "src/index.ts"
+compatibility_date = "2026-07-25"
+
+[vars]
+# Base host for both the upload API and generated preview subdomains.
+# Example:
+#   API:   https://preview.example.com/api/deploy
+#   Site:  https://my-site.preview.example.com
+SITE_DOMAIN = "preview.example.com"
+
+[[r2_buckets]]
+binding = "BYTRO_PREVIEW_BUCKET"
+bucket_name = "bytro-preview-assets"
+preview_bucket_name = "bytro-preview-assets-preview"
+
+# Replace both patterns and zone_name with a domain in your Cloudflare account.
+[[routes]]
+pattern = "preview.example.com/*"
+zone_name = "example.com"
+
+[[routes]]
+pattern = "*.preview.example.com/*"
+zone_name = "example.com"

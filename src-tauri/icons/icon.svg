@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="background" x1="112" y1="80" x2="888" y2="944" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07111F" />
+      <stop offset="0.55" stop-color="#0C2038" />
+      <stop offset="1" stop-color="#143557" />
+    </linearGradient>
+    <radialGradient id="halo" cx="0" cy="0" r="1" gradientTransform="translate(760 238) rotate(132) scale(548)">
+      <stop stop-color="#2085FF" stop-opacity="0.34" />
+      <stop offset="1" stop-color="#2085FF" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="mark" x1="264" y1="218" x2="760" y2="806" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5FAFF" />
+      <stop offset="0.34" stop-color="#B9E4FF" />
+      <stop offset="0.68" stop-color="#55B5FF" />
+      <stop offset="1" stop-color="#2085FF" />
+    </linearGradient>
+    <mask id="letter-b">
+      <rect width="1024" height="1024" fill="black" />
+      <rect x="264" y="218" width="148" height="588" rx="74" fill="white" />
+      <rect x="338" y="218" width="394" height="288" rx="144" fill="white" />
+      <rect x="338" y="506" width="422" height="300" rx="150" fill="white" />
+      <rect x="412" y="306" width="188" height="112" rx="56" fill="black" />
+      <rect x="412" y="594" width="216" height="124" rx="62" fill="black" />
+    </mask>
+  </defs>
+
+  <rect x="48" y="48" width="928" height="928" rx="232" fill="url(#background)" />
+  <rect x="48" y="48" width="928" height="928" rx="232" fill="url(#halo)" />
+  <rect
+    x="50"
+    y="50"
+    width="924"
+    height="924"
+    rx="230"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-opacity="0.1"
+    stroke-width="4"
+  />
+  <rect width="1024" height="1024" fill="url(#mark)" mask="url(#letter-b)" />
+</svg>

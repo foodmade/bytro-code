@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose a focused Community Edition improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem should be solved?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest useful behavior and expected workflow.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Data and network impact
+      description: Identify new storage, permissions, credentials, or network destinations.
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Community Edition scope
+      options:
+        - label: The proposal does not require a Bytro account or official credential.
+          required: true
+        - label: The proposal does not restore Canvas/OpenPencil or managed cloud updates.
+          required: true

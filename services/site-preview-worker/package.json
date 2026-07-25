@@ -1,0 +1,25 @@
+{
+  "name": "bytro-site-preview-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted static preview Worker for Bytro Community Edition.",
+  "license": "Apache-2.0",
+  "packageManager": "npm@10.9.7",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build:check": "wrangler deploy --config wrangler.example.toml --dry-run",
+    "test": "node --test tests/*.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260724.1",
+    "typescript": "^5.0.0",
+    "wrangler": "^4.114.0"
+  }
+}
