@@ -11,6 +11,7 @@ const CLAUDE_VERSION: &str = env!("CLAUDE_BINARY_VERSION");
 const CODEX_VERSION: &str = env!("CODEX_BINARY_VERSION");
 const INSTALL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_INSTALL_OUTPUT_BYTES: usize = 512 * 1024;
+static INSTALL_LOG_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProviderCli {
@@ -602,6 +603,9 @@ fn summarize_output(output: &Output) -> String {
 }
 
 fn append_install_log(message: &str) {
+    let _guard = INSTALL_LOG_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let Ok(log_dir) = crate::bytro_home::home_dir().map(|root| root.join("logs")) else {
         return;
     };
