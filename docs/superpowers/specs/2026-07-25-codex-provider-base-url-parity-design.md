@@ -32,11 +32,20 @@ configuration paths as the formal build:
    arguments.
 4. Keep `model_providers.OpenAI.requires_openai_auth=false` and
    `model_providers.OpenAI.env_key="OPENAI_API_KEY"`.
+5. For API-key sessions, write the same `auth.json` projection as the formal
+   build inside the isolated `CODEX_HOME`:
+   `{"OPENAI_API_KEY":"<configured key>"}`.
+6. Preserve that `auth.json` for persistent API-key sessions when the App
+   Server exits. A later launch overwrites it with the currently configured
+   key.
 
 The existing URL validator and TOML serializer remain authoritative. API keys
-must not be written into `config.toml` or command-line arguments.
+must not be written into `config.toml` or command-line arguments. The isolated
+`auth.json` is private application data and must be written with owner-only
+permissions on POSIX systems.
 
-OAuth sessions without a custom Base URL retain their existing behavior.
+OAuth sessions retain their existing authentication files and must never be
+overwritten with an API-key `auth.json`.
 
 ## Code Scope
 
@@ -55,6 +64,9 @@ Automated tests must prove:
 - A valid custom Base URL is present in the generated provider arguments.
 - The isolated TOML prefix contains exactly one `openai_base_url`.
 - The API key never appears in provider arguments or TOML.
+- API-key sessions generate the formal-build-compatible `auth.json`.
+- OAuth sessions do not generate or overwrite an API-key `auth.json`.
+- Persistent API-key session cleanup preserves `auth.json`.
 - Invalid or credential-bearing URLs are rejected by the existing validator.
 - OAuth/default provider arguments remain unchanged.
 
