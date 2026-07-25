@@ -4193,6 +4193,18 @@ function writePrivateCodexFile(filePath: string, content: string): void {
   }
 }
 
+export function writeCodexApiKeyAuthFile(
+  codexDir: string,
+  apiKey: string,
+  isOAuthAuth: boolean,
+): void {
+  if (isOAuthAuth) return;
+  writePrivateCodexFile(
+    join(codexDir, "auth.json"),
+    JSON.stringify({ OPENAI_API_KEY: apiKey }),
+  );
+}
+
 function isPathInside(candidate: string, root: string): boolean {
   const resolvedCandidate = resolve(candidate);
   const resolvedRoot = resolve(root);
@@ -4454,6 +4466,10 @@ async function _spawnAndInitializeRpcInner(params: RpcInitParams): Promise<RpcSe
     }
   }
 
+  // Match the formal build: Codex's built-in OpenAI provider reads API-key
+  // authentication from the isolated CODEX_HOME auth projection.
+  writeCodexApiKeyAuthFile(tempCodexDir, resolvedApiKey, isOAuthAuth);
+
   env.CODEX_HOME = tempCodexDir;
 
   // Build AGENTS.md — uses content cache to skip buildSkillIndex O(N) reads.
@@ -4518,7 +4534,7 @@ async function _spawnAndInitializeRpcInner(params: RpcInitParams): Promise<RpcSe
         cleanupBytroCodexRuntimeProjection(
           tempHome,
           tempCodexDir,
-          !isOAuthAuth,
+          false,
         );
       },
     );

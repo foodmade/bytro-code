@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -29,6 +30,7 @@ import {
   selectCodexBinaryCandidate,
   stripCodexMcpSectionsForRuntime,
   validateCodexBaseUrl,
+  writeCodexApiKeyAuthFile,
 } from "../openai-handler.js";
 
 describe("community Codex startup configuration", () => {
@@ -234,6 +236,32 @@ describe("community Codex startup configuration", () => {
     expect(() =>
       buildCodexBaseUrlToml('https://example.test/path?label="quoted"'),
     ).toThrow("must not include credentials");
+  });
+
+  it("writes formal-build-compatible API-key auth without overwriting OAuth", () => {
+    const tempHome = mkdtempSync(join(tmpdir(), "bytro-codex-auth-"));
+    const codexDir = join(tempHome, ".codex");
+    const authPath = join(codexDir, "auth.json");
+    mkdirSync(codexDir, { recursive: true });
+
+    try {
+      writeFileSync(authPath, '{"tokens":"oauth-sentinel"}');
+      writeCodexApiKeyAuthFile(codexDir, "replacement-key", true);
+      expect(readFileSync(authPath, "utf8")).toBe(
+        '{"tokens":"oauth-sentinel"}',
+      );
+
+      rmSync(authPath);
+      writeCodexApiKeyAuthFile(codexDir, "request-openai-key", false);
+      expect(JSON.parse(readFileSync(authPath, "utf8"))).toEqual({
+        OPENAI_API_KEY: "request-openai-key",
+      });
+      if (process.platform !== "win32") {
+        expect(statSync(authPath).mode & 0o077).toBe(0);
+      }
+    } finally {
+      rmSync(tempHome, { recursive: true, force: true });
+    }
   });
 
   it("hashes hostile conversation IDs into the sessions root", () => {
@@ -518,6 +546,47 @@ describe("community Codex startup configuration", () => {
         ),
       ).toBe(0);
       expect(existsSync(authorityFile)).toBe(true);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves persistent API-key auth during runtime projection cleanup", () => {
+    const runtimeRoot = mkdtempSync(
+      join(tmpdir(), "bytro-codex-auth-cleanup-root-"),
+    );
+    const tempHome = mkdtempSync(
+      join(runtimeRoot, "bytro-community-codex-2147483647-"),
+    );
+    const codexDir = join(tempHome, ".codex");
+    mkdirSync(codexDir, { recursive: true });
+    for (const name of [
+      "config.toml",
+      "auth.json",
+      "AGENTS.md",
+      "mcp-runtime-launcher.mjs",
+    ]) {
+      writeFileSync(join(codexDir, name), "sentinel-runtime-projection");
+    }
+
+    try {
+      expect(
+        cleanupBytroCodexRuntimeProjection(
+          tempHome,
+          codexDir,
+          false,
+          join(runtimeRoot, "unrelated-community-root"),
+          runtimeRoot,
+        ),
+      ).toBe(3);
+      expect(existsSync(join(codexDir, "config.toml"))).toBe(false);
+      expect(existsSync(join(codexDir, "AGENTS.md"))).toBe(false);
+      expect(existsSync(join(codexDir, "mcp-runtime-launcher.mjs"))).toBe(
+        false,
+      );
+      expect(readFileSync(join(codexDir, "auth.json"), "utf8")).toBe(
+        "sentinel-runtime-projection",
+      );
     } finally {
       rmSync(runtimeRoot, { recursive: true, force: true });
     }
