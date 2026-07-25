@@ -1,312 +1,226 @@
-# Bytro Community Edition
+<p align="center">
+  <img src="./src-tauri/icons/icon.png" width="112" alt="Bytro logo">
+</p>
 
-> Local-first desktop workspace for coding agents. Bring your own model
-> credentials and locally installed runtimes.
+<h1 align="center">Bytro Community Edition</h1>
 
-Bytro Community Edition is a public, self-managed desktop workspace. It
-combines AI chat, project files, code review, Git, terminals, previews, MCP
-tools, reusable skills, and multi-agent collaboration inside a Tauri desktop
-application.
+<p align="center"><strong>One local workspace for every coding agent.</strong></p>
 
-The Community Edition is designed to run on your computer. It has no Bytro
-account, no Bytro-hosted model credentials, no managed CLI/runtime downloads,
-and no official cloud updater.
+<p align="center">
+  Bring models, conversations, project files, terminals, Git, MCP, skills, and
+  multi-agent workflows together in one desktop app.
+</p>
 
-> **Pre-release status:** the Community Edition is being prepared for its first
-> public release. Build from source only after reviewing the current limitations
-> and security notes.
+<p align="center">
+  <strong>English</strong> · <a href="./README.zh-CN.md">简体中文</a>
+</p>
 
-## Community Edition at a glance
+<p align="center">
+  <a href="./LICENSE"><img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-6f42c1"></a>
+  <img alt="Local-first" src="https://img.shields.io/badge/local--first-yes-16a085">
+  <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB">
+  <img alt="React and TypeScript" src="https://img.shields.io/badge/React%20%2B%20TypeScript-3178C6">
+</p>
 
-### Included
+Bytro is a local-first desktop workspace for AI-assisted development. Configure
+your own providers, keep project context and settings on your machine, and move
+from a question to code, terminal output, Git review, or a working preview
+without switching tools.
 
-- Streaming conversations with locally configured providers and CLI runtimes.
-- Bring-your-own-key profiles with custom model names and base URLs.
-- Import of supported local provider configuration.
-- Claude-compatible, Codex/OpenAI-compatible, Gemini-compatible, generic
-  OpenAI-compatible, and local Ollama workflows where the corresponding runtime
-  or credential is available.
-- Project file tree, editor, diffs, checkpoints, and change review.
-- Integrated PTY terminals and development-server discovery.
-- Git status, staging, commits, branches, history, stash, pull, and push.
-- Multiple conversations, local history, context compaction, per-turn/context
-  token metadata, and a local workspace activity heatmap.
-- MCP server configuration, project/user skills, and slash commands.
-- Multi-agent teams, task routing, inboxes, and live agent status.
-- Local project preview and an optional self-hosted Cloudflare Worker for
-  publishing temporary static previews.
-- Local speech-to-text when a supported Whisper runtime/model is configured.
+## Why Bytro?
 
-### Deliberately not included
+|                               |                                                                                                                       |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **One workspace**             | Chat, browse files, edit code, inspect diffs, run terminals, manage Git, and preview projects without losing context. |
+| **Your models and endpoints** | Use user-configured Claude, Codex/OpenAI, Gemini, OpenAI-compatible, or local Ollama workflows.                       |
+| **Local-first state**         | Conversations, workspace state, model profiles, MCP configuration, and API settings persist locally across restarts.  |
+| **Built for agentic work**    | Review tool calls, reuse skills, connect MCP servers, and coordinate multiple agents from the same project.           |
 
-- Bytro sign-in, registration, subscriptions, balance, invitations, or profile
-  services.
-- Bytro official models or shared official API credentials.
-- OpenPencil/Canvas integration or its bundled resources.
-- Cloud-backed AI usage and billing dashboards.
-- Downloading or updating provider CLIs or core-toolchain runtimes from Bytro
-  infrastructure.
-- Automatic installation or management of third-party CLI memory plugins,
-  including `claude-mem`.
-- Frontend, Sidecar, or native hotpatch delivery from Bytro infrastructure.
-- Hosted remote-control/tunnel services.
-- Private R2 release scripts or an `npm run release` one-click publication
-  command.
+## Highlights
 
-Token and context data is recorded locally where the selected provider exposes
-it. The workspace activity heatmap uses that local data; the removed cloud
-usage/billing dashboard is not required.
+- **Multi-provider conversations** — stream responses from hosted APIs, custom
+  compatible endpoints, and supported local provider runtimes.
+- **Complete project workspace** — file tree, editor, search, diffs,
+  checkpoints, code review, and project-aware context.
+- **Integrated development tools** — PTY terminals, development-server
+  detection, local previews, and Git workflows from status to push.
+- **MCP and reusable skills** — persist user MCP configuration, discover
+  project or user skills, and invoke slash commands.
+- **Multi-agent collaboration** — create teams, route tasks, follow live
+  status, and receive agent messages in one place.
+- **Bring your own configuration** — save API keys, custom base URLs, model
+  names, proxies, and supported provider profiles.
+- **Optional publishing** — keep previews local or connect an independently
+  deployed site-preview Worker.
 
-For the complete boundary, see
-[Community Edition](docs/COMMUNITY_EDITION.md). Publication criteria are
-tracked in the public
-[open-source readiness checklist](docs/OPEN_SOURCE_READINESS.md).
+## Quick Start
 
-## How it works
+### Prerequisites
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ React + TypeScript                                          │
-│ chat · files · editor · Git · terminal · teams · MCP/skills │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ typed Tauri IPC + events
-┌──────────────────────────────▼───────────────────────────────┐
-│ Tauri + Rust                                                │
-│ desktop lifecycle · filesystem · PTY · Git · SQLite · IPC   │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ NDJSON over local stdio
-┌──────────────────────────────▼───────────────────────────────┐
-│ Node.js Sidecar                                             │
-│ provider/CLI adapters · streaming · tools · MCP · teams     │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ user-selected endpoints/runtimes
-                        Model providers and local CLIs
-```
-
-The frontend does not receive direct filesystem or process access. Privileged
-desktop operations pass through Rust commands, while provider and CLI traffic
-is isolated in the local Node.js Sidecar. Conversations and workspace state
-are stored locally.
-
-Read [Architecture](docs/ARCHITECTURE.md) for process boundaries, data flow,
-failure behavior, and security assumptions.
-
-## Requirements
-
-- Node.js 20 or newer (Node.js 22 or newer for the optional preview Worker)
+- [Node.js](https://nodejs.org/) 20 or newer
 - npm 10 or newer
-- Rust stable toolchain
-- Platform prerequisites required by
-  [Tauri 2](https://v2.tauri.app/start/prerequisites/)
+- Rust stable
 - Git
-- At least one supported local CLI runtime or provider API key
+- The prerequisites for your platform from the
+  [Tauri 2 guide](https://v2.tauri.app/start/prerequisites/)
 
-Provider-owned login may still be required by a locally installed CLI. That is
-separate from a Bytro application account.
+### Run from source
 
-Claude CLI and Codex CLI are optional third-party programs that you install
-and authenticate separately. This repository does not bundle, download, or
-update either CLI. By installing or using a CLI, you accept the provider's
-applicable license and service terms. The upstream Codex CLI source is
-Apache-2.0 licensed; Claude CLI is governed by Anthropic's applicable terms.
-See [Provider configuration](docs/PROVIDERS.md) before enabling either runtime.
-
-## Run from source
+From a checkout of this repository:
 
 ```bash
-git clone <your-fork-url>
 cd bytro-community
 npm ci
 npm --prefix sidecar ci
 npm run tauri dev
 ```
 
-Do not put credentials in committed files. The example file is only for the
-optional self-hosted preview Worker:
+The Tauri development hook builds the local Sidecar, starts Vite on port
+`1420`, and launches the desktop application.
 
-```bash
-cp .env.example .env.local
-```
+> [!NOTE]
+> Bytro Community Edition is currently pre-release. Build it from source and
+> review the [security](./SECURITY.md) and [privacy](./PRIVACY.md) notes before
+> using it with sensitive repositories or production credentials.
 
-Configure model profiles inside the application or import a supported local
-configuration. Provider credentials and CLI paths may also be inherited from
-the environment used to launch Bytro. See
-[Provider configuration](docs/PROVIDERS.md) and
-[Runtime configuration](docs/CONFIGURATION.md).
+## Configure a Model
+
+1. Open Bytro and go to model configuration.
+2. Create or import a supported provider profile.
+3. Enter the exact model name and, when needed, your API key and base URL.
+4. Test the profile, then select it from the conversation composer.
 
 User-saved model profiles, API keys, base URLs, proxies, and MCP configuration
-are persisted in Bytro's local application-data locations so they remain
-available after restart. See [Privacy](PRIVACY.md) for storage and security
-limitations.
+persist in Bytro's local application data after restart.
 
-## Local builds
+For Claude and Codex sessions, Bytro prepares the required platform package
+with the local Node.js/npm toolchain when it is missing. Package versions are
+pinned by [`sidecar/package.json`](./sidecar/package.json), and the private
+runtime is stored under `~/.bytro-community/cli`. Startup preparation is
+best-effort and is retried when a session requires the runtime.
 
-Build the frontend and Sidecar:
+Provider authentication, quota, billing, and service terms remain those of the
+provider you configure. See [Provider Configuration](./docs/PROVIDERS.md) for
+connection patterns and troubleshooting.
 
-```bash
-npm run build:sidecar
-npm run build
+## Architecture
+
+```mermaid
+flowchart TB
+    User["Developer"]
+
+    subgraph Desktop["Bytro desktop application"]
+        UI["React + TypeScript UI"]
+        Host["Tauri + Rust desktop host"]
+        Sidecar["Node.js agent sidecar"]
+        Storage[("Local settings and SQLite")]
+
+        UI <-->|"typed IPC and events"| Host
+        Host <-->|"NDJSON over local stdio"| Sidecar
+        Host <--> Storage
+    end
+
+    Providers["Model APIs and local provider runtimes"]
+    MCP["MCP servers and tools"]
+    Preview["Optional self-hosted preview worker"]
+
+    User --> UI
+    Sidecar <--> Providers
+    Sidecar <--> MCP
+    Host -.-> Preview
 ```
 
-After installing the optional Worker dependencies, run the complete source
-validation gate:
+The React frontend owns presentation and interaction. Privileged filesystem,
+Git, PTY, database, and operating-system work passes through the Rust/Tauri
+host. Provider sessions, streaming, tools, MCP, skills, and teams are isolated
+in a restartable local Node.js Sidecar.
+
+Read [Architecture](./docs/ARCHITECTURE.md) for process boundaries, request
+flow, storage, and failure behavior.
+
+## Local Data and Privacy
+
+Bytro keeps its application state in operating-system application-data
+locations and the user-owned `~/.bytro-community` directory. This includes:
+
+- conversations and workspace state;
+- model profiles, API keys, custom endpoints, and proxy settings;
+- MCP server configuration and managed skills; and
+- provider runtime paths and local diagnostics.
+
+Saved credentials currently persist unencrypted and are not protected by the
+operating system's credential vault. Protect your OS account, use
+least-privilege keys, and never commit credentials to a project.
+
+Bytro connects to the network when a configured workflow or runtime setup
+requires it. Destinations can include the npm registry used to prepare pinned
+Claude/Codex packages, a model endpoint, Git remote, MCP server, or optional
+preview Worker. Review [Privacy](./PRIVACY.md),
+[Network and Data](./docs/NETWORK_AND_DATA.md), and
+[Runtime Configuration](./docs/CONFIGURATION.md) before using sensitive data.
+
+## Development
+
+| Command                 | Purpose                                |
+| ----------------------- | -------------------------------------- |
+| `npm run build:sidecar` | Build the local Node.js Sidecar bundle |
+| `npm run build`         | Type-check and build the frontend      |
+| `npm test`              | Run frontend tests                     |
+| `npm run test:sidecar`  | Run Sidecar tests                      |
+| `npm run check:rust`    | Check the Rust/Tauri crate             |
+| `npm run tauri build`   | Create a local platform package        |
+
+After installing the optional preview Worker dependencies, run the complete
+source validation gate:
 
 ```bash
 npm --prefix services/site-preview-worker ci
 npm run ci:gate
 ```
 
-Create a local Tauri package:
+See [Building from Source](./docs/BUILDING.md) for platform packaging,
+validation, and dependency-review details.
 
-```bash
-npm run tauri build
-```
-
-This repository intentionally has no command that publishes installers,
-uploads patches, or deploys an official release. A package you build or
-redistribute is an unofficial build unless the relevant rights holder
-explicitly says otherwise. Apache-2.0 permits redistribution and commercial
-use, but it does not grant trademark rights in Bytro Community Edition,
-Bytro, or their logos. Read [TRADEMARKS.md](TRADEMARKS.md).
-
-More detail is available in [Building](docs/BUILDING.md).
-
-## Bring your own model configuration
-
-Bytro resolves a provider from local inputs. The intended resolution order
-is:
-
-```text
-explicit local profile or launch-environment path
-  > supported process environment
-  > system PATH
-  > actionable not-configured error
-```
-
-No Community Edition path falls back to a Bytro official credential. Legacy
-conversations that reference an official profile must be reassigned to a local
-profile before they can continue.
-
-Provider-owned Claude, Codex, and Gemini configuration may be scanned for an
-explicit credential/profile import. Supported command, skill, session-history,
-and team-state files may also be discovered read-only in place for local
-compatibility behavior; opening or synchronizing a provider conversation may
-copy its messages into Bytro's own database. Bytro does not write back,
-synchronize, enable, disable, or delete files in those provider directories. A
-provider CLI launched for a real user session may still update its own
-authentication, session, cache, or history files according to that CLI's
-documented behavior.
-
-Recommended practices:
-
-- use a provider key with the minimum required scope;
-- prefer environment variables or the operating system credential mechanism
-  over plaintext project files;
-- use a separate key for development;
-- never commit `.env`, `.env.local`, `.dev.vars`, or imported credential files;
-- review custom base URLs before sending project context.
-
-## Optional self-hosted site preview
-
-Local iframe preview works without Cloudflare. Publishing a temporary static
-preview is optional and requires infrastructure you control:
-
-1. a Cloudflare account;
-2. an R2 bucket;
-3. the Worker in `services/site-preview-worker`;
-4. your own domain/routes; and
-5. an upload API key stored as a Worker secret.
-
-The desktop receives only:
-
-```dotenv
-BYTRO_DEPLOY_WORKER_URL=
-BYTRO_DEPLOY_API_KEY=
-```
-
-The same values may be supplied at startup. In Tauri development mode, the
-second `--` separates runner arguments from application arguments:
-
-```bash
-npm run tauri -- dev -- -- --deploy-worker-url https://preview.example.com \
-  --deploy-api-key "$BYTRO_DEPLOY_API_KEY"
-```
-
-Command-line values take precedence over process environment, then
-`.env.local` and `.env` in the Bytro Community data directory
-(`~/.bytro-community`) or a
-recognized Community Edition development checkout. The application never reads
-a generic `~/.env`. Command-line secrets can be visible to local
-process-inspection tools, so environment or local configuration is preferred.
-R2 account credentials stay in Cloudflare/Wrangler and must never be passed to
-the desktop application.
-
-Follow the [Worker deployment guide](services/site-preview-worker/README.md).
-
-## Local-first privacy
-
-The Community Edition does not require a Bytro account and must not send device
-fingerprints, account activity, conversation usage, or workspace telemetry to
-Bytro services.
-
-Network requests still occur when you deliberately use:
-
-- a remote model provider or custom API endpoint;
-- Git remotes;
-- an MCP server;
-- a skill or tool that performs network access; or
-- your self-hosted preview Worker.
-
-You are responsible for the endpoint and tool configuration you enable. See
-[Network and data](docs/NETWORK_AND_DATA.md) and [PRIVACY.md](PRIVACY.md).
-
-## Repository layout
+## Repository Layout
 
 ```text
 .
 ├── src/                         # React application
-├── src-tauri/                   # Rust/Tauri desktop layer
-├── sidecar/                     # Local Node.js provider bridge
-├── resources/                   # Public runtime/build resources
+├── src-tauri/                   # Rust/Tauri desktop host
+├── sidecar/                     # Local Node.js agent runtime
+├── resources/                   # Runtime and build resources
 ├── services/
-│   └── site-preview-worker/     # Optional self-hosted Worker
-├── docs/                        # Public architecture and operations docs
-└── .github/                     # CI and security automation
+│   └── site-preview-worker/     # Optional self-hosted preview service
+└── docs/                        # Architecture and operations guides
 ```
 
-Generated bundles, downloaded runtimes, local databases, private patches,
-credentials, and build output do not belong in source control.
+## Documentation
 
-## Security
-
-Please do not publish vulnerabilities in a public issue. Follow
-[SECURITY.md](SECURITY.md). In particular:
-
-- treat provider keys and the preview upload key as secrets;
-- inspect MCP servers and skills before enabling them;
-- review commands and file changes proposed by an agent;
-- keep permission prompts enabled when working in an unfamiliar repository; and
-- verify the provenance of unofficial builds.
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Building from Source](./docs/BUILDING.md)
+- [Provider Configuration](./docs/PROVIDERS.md)
+- [Runtime Configuration](./docs/CONFIGURATION.md)
+- [Network and Data](./docs/NETWORK_AND_DATA.md)
+- [Privacy](./PRIVACY.md)
+- [Security](./SECURITY.md)
+- [Support](./SUPPORT.md)
 
 ## Contributing
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md), follow the
-[Code of Conduct](CODE_OF_CONDUCT.md), and keep changes within the Community
-Edition boundary. Contributions that restore private account services, official
-credentials, Canvas/OpenPencil resources, or managed Bytro update paths will
-not be accepted.
+Contributions are welcome. Start with [CONTRIBUTING.md](./CONTRIBUTING.md),
+follow the [Code of Conduct](./CODE_OF_CONDUCT.md), keep changes focused, and
+include tests or documentation when behavior changes.
 
-## License and marks
+## Security
 
-The project code is licensed under the unmodified
-[Apache License 2.0](LICENSE). Copyright 2026 misschendo and contributors.
+Bytro can read project files, execute tools, launch local processes, and send
+selected context to configured providers. Treat it as a high-privilege
+developer application. Report vulnerabilities privately according to
+[SECURITY.md](./SECURITY.md).
 
-Third-party components retain their own licenses; see
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [NOTICE](NOTICE).
-Apache-2.0 does not grant permission to use the Bytro Community Edition or
-Bytro names or logos; see [TRADEMARKS.md](TRADEMARKS.md).
+## License
 
-## Support
-
-Community support expectations and the information to include in a report are
-documented in [SUPPORT.md](SUPPORT.md).
+The project code is licensed under the
+[Apache License 2.0](./LICENSE). Third-party components retain their own
+licenses; see [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) and
+[NOTICE](./NOTICE).
