@@ -22,10 +22,10 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.3.198",
+    "@anthropic-ai/claude-agent-sdk": "0.3.220",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "openai": "^6.21.0",
-    "zod": "^4.0.0"
+    "openai": "^6.49.0",
+    "zod": "^4.4.3"
   },
   "overrides": {
     "@hono/node-server": "2.0.11",
@@ -38,9 +38,9 @@
     "codex": "0.144.4"
   },
   "devDependencies": {
-    "@types/node": "^25.2.2",
+    "@types/node": "^26.1.1",
     "esbuild": "^0.28.1",
-    "typescript": "~5.8.3",
+    "typescript": "~7.0.2",
     "vitest": "^4.0.18"
   }
 }
