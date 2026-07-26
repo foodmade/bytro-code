@@ -53,7 +53,7 @@ Git 审查和项目预览。
 
 ### 前置要求
 
-- [Node.js](https://nodejs.org/) 20 或更高版本
+- [Node.js](https://nodejs.org/) 20.19+ 或 22.12+
 - npm 10 或更高版本
 - Rust stable
 - Git

@@ -6,7 +6,7 @@ deploys private infrastructure.
 
 ## Prerequisites
 
-- Node.js 20 or newer for the desktop application; Node.js 22 or newer when
+- Node.js 20.19+ or 22.12+ for the desktop application; Node.js 22.12+ when
   installing or validating the optional preview Worker
 - npm 10 or newer
 - Rust stable
