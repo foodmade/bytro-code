@@ -2,7 +2,7 @@
 // PromptStream — AsyncIterable that mirrors SDK V2 Session's Stream pattern
 // ---------------------------------------------------------------------------
 
-import type { SDKUserMessage } from "./claude-cli-adapter.js";
+import type { SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { summarizeDiagnosticText } from "./shared.js";
 
 /**

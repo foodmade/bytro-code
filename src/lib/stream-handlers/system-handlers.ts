@@ -78,6 +78,16 @@ function persistCrossSession(_message: string): void {
 
 export function formatChatError(errorText: string, errorStatus?: number): string {
   const normalized = errorText.toLowerCase();
+  const providerCliUnavailable =
+    normalized.includes("enoent")
+    || normalized.includes("command not found")
+    || normalized.includes("executable not found")
+    || normalized.includes("cli not found")
+    || normalized.includes("cli is unavailable")
+    || normalized.includes("cli unavailable")
+    || normalized.includes("claude code is not installed")
+    || normalized.includes("codex is not installed")
+    || (normalized.includes("failed to spawn") && normalized.includes("not found"));
   let category: string;
   if (/\bmodel_not_found\b/i.test(errorText) || /model .*not found/i.test(errorText)) {
     category = i18n.t("chat.errors.modelNotFound");
@@ -101,11 +111,7 @@ export function formatChatError(errorText: string, errorStatus?: number): string
     || normalized.includes("base url is required")
   ) {
     category = "Provider configuration is incomplete";
-  } else if (
-    normalized.includes("enoent")
-    || normalized.includes("not found")
-    || normalized.includes("unavailable")
-  ) {
+  } else if (providerCliUnavailable) {
     category = "Required provider CLI is unavailable";
   } else if (
     errorStatus === 400

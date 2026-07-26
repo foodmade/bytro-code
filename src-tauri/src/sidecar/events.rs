@@ -37,6 +37,15 @@ fn event_diagnostic_summary(event_type: &str, value: &str) -> String {
 
 fn public_stream_error(error: &str, status: Option<u16>) -> String {
     let normalized = error.to_ascii_lowercase();
+    let provider_cli_unavailable = normalized.contains("enoent")
+        || normalized.contains("command not found")
+        || normalized.contains("executable not found")
+        || normalized.contains("cli not found")
+        || normalized.contains("cli is unavailable")
+        || normalized.contains("cli unavailable")
+        || normalized.contains("claude code is not installed")
+        || normalized.contains("codex is not installed")
+        || (normalized.contains("failed to spawn") && normalized.contains("not found"));
     let category = if normalized.contains("abort") || normalized.contains("cancel") {
         "Provider request was cancelled"
     } else if status == Some(429) || normalized.contains("rate limit") || normalized.contains("429")
@@ -55,10 +64,7 @@ fn public_stream_error(error: &str, status: Option<u16>) -> String {
         || normalized.contains("base url is required")
     {
         "Provider configuration is incomplete"
-    } else if normalized.contains("enoent")
-        || normalized.contains("not found")
-        || normalized.contains("unavailable")
-    {
+    } else if provider_cli_unavailable {
         "Required provider CLI is unavailable"
     } else if status == Some(400)
         || normalized.contains("invalid request")
@@ -1953,5 +1959,9 @@ mod privacy_tests {
             public_stream_error("API key is not configured provider body", None)
                 .starts_with("Provider configuration is incomplete")
         );
+        assert!(public_stream_error("model claude-opus-4-8 not found", None)
+            .starts_with("Provider request failed"));
+        assert!(public_stream_error("spawn claude ENOENT", None)
+            .starts_with("Required provider CLI is unavailable"));
     }
 }

@@ -10,6 +10,7 @@
  * - No `id` + has `method` → Server notification (e.g. turn/started)
  */
 
+import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -56,6 +57,46 @@ const RPC_IMPORTANT_TRACE_PREVIEW_LIMIT = 2_000;
 
 const log = createLogger("codex-rpc");
 
+function authDebugSecret(value: string | undefined): string {
+  if (!value) return "(empty)";
+  const digest = createHash("sha256").update(value).digest("hex").slice(0, 12);
+  return `len=${value.length} sha256=${digest}`;
+}
+
+function authDebugBaseUrl(value: string | undefined): string {
+  if (!value?.trim()) return "(default)";
+  try {
+    const parsed = new URL(value);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return "(invalid)";
+  }
+}
+
+function sanitizeAuthDebugMessage(
+  value: unknown,
+  knownSecret?: string,
+): string {
+  let message = value instanceof Error ? value.message : String(value ?? "");
+  if (knownSecret) {
+    message = message.split(knownSecret).join("[REDACTED]");
+  }
+  message = message
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, "[REDACTED]")
+    .replace(
+      /([?&](?:api[_-]?key|access[_-]?token|token)=)[^&\s]+/gi,
+      "$1[REDACTED]",
+    )
+    .replace(/[\r\n\t]+/g, " ")
+    .trim();
+  return message.slice(0, 1_000) || "(empty)";
+}
+
+function writeAuthDebug(event: string, detail: string): void {
+  process.stderr.write(`[auth-debug][${event}] ${detail}\n`);
+}
+
 export function summarizeRpcTraceBody(
   msg: Record<string, unknown>,
 ): string {
@@ -85,6 +126,7 @@ export class CodexRpcChannel {
   private readonly _process: ChildProcess;
   private readonly _processTree: ProcessTreeTarget;
   private readonly _readline: ReadlineInterface;
+  private readonly _authDebugApiKey: string | undefined;
   private _nextId = 1;
   private readonly _pending = new Map<number, PendingRequest>();
   private readonly _notificationListeners = new Set<NotificationListener>();
@@ -106,6 +148,7 @@ export class CodexRpcChannel {
     env: Record<string, string>,
     private readonly _onProcessClosed?: () => void,
   ) {
+    this._authDebugApiKey = env.OPENAI_API_KEY;
     this._exitPromise = new Promise<number>((resolve) => {
       this._exitResolve = resolve;
     });
@@ -113,6 +156,12 @@ export class CodexRpcChannel {
     log(`Spawning: ${codexBinaryPath} ${args.join(" ")}`);
     log(`[spawn-diag] platform=${process.platform} arch=${process.arch} nodeVersion=${process.version}`);
     log(`[spawn-diag] env.HOME=${env.HOME ?? "(unset)"} env.USERPROFILE=${env.USERPROFILE ?? "(unset)"}`);
+    writeAuthDebug(
+      "codex/spawn",
+      `base_url=${authDebugBaseUrl(env.OPENAI_BASE_URL)} ` +
+      `api_key=${authDebugSecret(env.OPENAI_API_KEY)} ` +
+      `provider_env_key=${env.OPENAI_API_KEY ? "OPENAI_API_KEY" : "(none)"}`,
+    );
 
     const invocation = prepareCliProcessInvocation(
       codexBinaryPath,
@@ -139,6 +188,12 @@ export class CodexRpcChannel {
       this._process.stderr.on("data", (chunk: Buffer) => {
         const text = chunk.toString("utf-8").trimEnd();
         if (text) log(`[stderr] ${text}`);
+        if (/(?:\b401\b|\b403\b|auth(?:entication|orization)?|unauthorized|forbidden|api[ _-]?key|invalid[ _-]?token)/i.test(text)) {
+          writeAuthDebug(
+            "codex/stderr",
+            `message=${sanitizeAuthDebugMessage(text, env.OPENAI_API_KEY)}`,
+          );
+        }
       });
     }
 
@@ -450,6 +505,11 @@ export class CodexRpcChannel {
 
     if (msg.error) {
       const err = msg.error as { code?: number; message?: string };
+      writeAuthDebug(
+        "codex/rpc-error",
+        `method=${pending.method} code=${err.code ?? -1} ` +
+        `message=${sanitizeAuthDebugMessage(err.message, this._authDebugApiKey)}`,
+      );
       pending.reject(
         new Error(`RPC error ${err.code ?? -1}: ${err.message ?? "unknown"}`),
       );
@@ -461,6 +521,30 @@ export class CodexRpcChannel {
   private _handleNotification(msg: Record<string, unknown>): void {
     const method = msg.method as string;
     const params = (msg.params ?? {}) as Record<string, unknown>;
+    if (method === "error") {
+      const error = params.error as {
+        code?: string;
+        message?: string;
+        type?: string;
+      } | undefined;
+      writeAuthDebug(
+        "codex/error-notification",
+        `will_retry=${String(params.willRetry ?? false)} ` +
+        `type=${error?.type ?? "(none)"} code=${error?.code ?? "(none)"} ` +
+        `message=${sanitizeAuthDebugMessage(error?.message, this._authDebugApiKey)}`,
+      );
+    } else if (method === "turn/completed") {
+      const turn = params.turn as {
+        status?: string;
+        error?: { message?: string } | null;
+      } | undefined;
+      if (turn?.status === "failed") {
+        writeAuthDebug(
+          "codex/turn-failed",
+          `message=${sanitizeAuthDebugMessage(turn.error?.message, this._authDebugApiKey)}`,
+        );
+      }
+    }
     for (const listener of this._notificationListeners) {
       try {
         listener(method, params);

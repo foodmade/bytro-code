@@ -186,8 +186,14 @@ export function publicSidecarErrorMessage(error: unknown): string {
   const normalized = message.toLowerCase();
   if (
     normalized.includes("enoent") ||
-    normalized.includes("not found") ||
-    normalized.includes("unavailable")
+    normalized.includes("command not found") ||
+    normalized.includes("executable not found") ||
+    normalized.includes("cli not found") ||
+    normalized.includes("cli is unavailable") ||
+    normalized.includes("cli unavailable") ||
+    normalized.includes("claude code is not installed") ||
+    normalized.includes("codex is not installed") ||
+    (normalized.includes("failed to spawn") && normalized.includes("not found"))
   ) {
     return "Required provider CLI is unavailable";
   }

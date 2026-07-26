@@ -6,8 +6,8 @@
 // streaming to the frontend. Agent definitions are never placed in argv.
 // ---------------------------------------------------------------------------
 
-import { query } from "./claude-cli-adapter.js";
-import type { Options, StreamObserver } from "./claude-cli-adapter.js";
+import { query } from "@anthropic-ai/claude-agent-sdk";
+import type { HookCallback, Options } from "@anthropic-ai/claude-agent-sdk";
 import { createHash } from "node:crypto";
 import type { TeamsQueryCommand, TodoItem } from "./protocol.js";
 import { buildPermissionConfig } from "./permissions.js";
@@ -16,6 +16,7 @@ import {
   findClaudeCodePath,
   computeTodoDiff,
   defaultToolDisplay,
+  buildProcessEnvWithManagedPath,
   summarizeDiagnosticText,
 } from "./shared.js";
 import type { EmitFn } from "./shared.js";
@@ -23,7 +24,6 @@ import {
   applyCredentials,
   restoreCredentials,
   acquireCredentialLock,
-  captureClaudeProviderEnvironment,
 } from "./credential-strategy.js";
 import {
   PromptChannel,
@@ -51,6 +51,15 @@ import {
 } from "./teams-subagent-watcher.js";
 import { readNewInboxMessages, formatInboxMessages } from "./teams-inbox.js";
 import type { InboxMonitor } from "./teams-inbox.js";
+
+type HookObserver = (...args: Parameters<HookCallback>) => Promise<void>;
+
+function asObservationHook(observer: HookObserver): HookCallback {
+  return async (...args) => {
+    await observer(...args);
+    return { continue: true };
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Internal interfaces
@@ -213,7 +222,7 @@ export async function handleTeamsQuery(
     // Observation-only CLI stream callbacks
     // ------------------------------------------------------------------
 
-    const subagentStartObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    const subagentStartObserver: HookObserver = async (input, _toolUseID, _options) => {
       if (input.hook_event_name === "SubagentStart") {
         const raw = input as Record<string, unknown>;
         const agentId = typeof raw.agent_id === "string" ? raw.agent_id : "";
@@ -304,7 +313,7 @@ export async function handleTeamsQuery(
       }
     };
 
-    const subagentStopObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    const subagentStopObserver: HookObserver = async (input, _toolUseID, _options) => {
       if (input.hook_event_name === "SubagentStop") {
         const raw = input as Record<string, unknown>;
         const agentId = typeof raw.agent_id === "string" ? raw.agent_id : "";
@@ -359,7 +368,7 @@ export async function handleTeamsQuery(
       }
     };
 
-    const preTaskObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    const preTaskObserver: HookObserver = async (input, _toolUseID, _options) => {
       const raw = input as Record<string, unknown>;
       const toolInput = raw.tool_input as Record<string, unknown> | undefined;
       const desc = typeof toolInput?.description === "string" ? toolInput.description : undefined;
@@ -382,7 +391,7 @@ export async function handleTeamsQuery(
 
     };
 
-    const todoWriteObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    const todoWriteObserver: HookObserver = async (input, _toolUseID, _options) => {
       const raw = input as Record<string, unknown>;
       const toolInput = raw.tool_input as Record<string, unknown> | undefined;
       if (Array.isArray(toolInput?.todos)) {
@@ -393,7 +402,7 @@ export async function handleTeamsQuery(
       }
     };
 
-    const taskToolObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    const taskToolObserver: HookObserver = async (input, _toolUseID, _options) => {
       const raw = input as Record<string, unknown>;
       const toolName = typeof raw.tool_name === "string" ? raw.tool_name : "";
       const toolInput = raw.tool_input as Record<string, unknown> | undefined;
@@ -410,7 +419,7 @@ export async function handleTeamsQuery(
       }
     };
 
-    const fileChangeObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    const fileChangeObserver: HookObserver = async (input, _toolUseID, _options) => {
       const raw = input as Record<string, unknown>;
       const toolName = typeof raw.tool_name === "string" ? raw.tool_name : "";
       const toolInput = raw.tool_input as Record<string, unknown> | undefined;
@@ -453,19 +462,19 @@ export async function handleTeamsQuery(
       includePartialMessages: true,
       pathToClaudeCodeExecutable: claudePath,
       settingSources: ["user", "project", "local"],
-      streamObservers: {
-        SubagentStart: [{ observers: [subagentStartObserver] }],
-        SubagentStop: [{ observers: [subagentStopObserver] }],
-        PreToolUse: [{ matcher: "^(Task|Agent)$", observers: [preTaskObserver] }],
+      hooks: {
+        SubagentStart: [{ hooks: [asObservationHook(subagentStartObserver)] }],
+        SubagentStop: [{ hooks: [asObservationHook(subagentStopObserver)] }],
+        PreToolUse: [{ matcher: "^(Task|Agent)$", hooks: [asObservationHook(preTaskObserver)] }],
         PostToolUse: [
-          { matcher: "TodoWrite", observers: [todoWriteObserver] },
-          { matcher: "^(TaskCreate|TaskUpdate|TaskGet|TaskList)$", observers: [taskToolObserver] },
-          { matcher: "Edit|Write", observers: [fileChangeObserver] },
+          { matcher: "TodoWrite", hooks: [asObservationHook(todoWriteObserver)] },
+          { matcher: "^(TaskCreate|TaskUpdate|TaskGet|TaskList)$", hooks: [asObservationHook(taskToolObserver)] },
+          { matcher: "Edit|Write", hooks: [asObservationHook(fileChangeObserver)] },
         ],
         TaskCreated: [
           {
-            observers: [
-              async (input) => {
+            hooks: [
+              asObservationHook(async (input) => {
                 const update = updateTaskTrackerFromLifecycle(
                   taskTrackerState,
                   previousTodos,
@@ -476,14 +485,14 @@ export async function handleTeamsQuery(
                   previousTodos = update.todos;
                   emit({ evt: "todo_updated", id, todos: update.todos, diff: update.diff });
                 }
-              },
+              }),
             ],
           },
         ],
         TaskCompleted: [
           {
-            observers: [
-              async (input) => {
+            hooks: [
+              asObservationHook(async (input) => {
                 const update = updateTaskTrackerFromLifecycle(
                   taskTrackerState,
                   previousTodos,
@@ -494,14 +503,14 @@ export async function handleTeamsQuery(
                   previousTodos = update.todos;
                   emit({ evt: "todo_updated", id, todos: update.todos, diff: update.diff });
                 }
-              },
+              }),
             ],
           },
         ],
       },
     };
     options.env = {
-      ...captureClaudeProviderEnvironment(),
+      ...buildProcessEnvWithManagedPath(undefined),
       CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1",
     };
     (options as Record<string, unknown>).stderr = (message: string) => {
@@ -533,8 +542,9 @@ export async function handleTeamsQuery(
     if (permConfig.allowDangerouslySkipPermissions) {
       options.allowDangerouslySkipPermissions = true;
     }
-    // The local CLI has no canUseTool callback bridge. The adapter maps
-    // default to dontAsk so approval-gated tools fail closed.
+    if (permConfig.canUseTool) {
+      options.canUseTool = permConfig.canUseTool;
+    }
 
     options.systemPrompt = {
       type: "preset" as const,

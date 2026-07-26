@@ -52,6 +52,11 @@ describe("private sidecar diagnostics", () => {
     expect(publicSidecarErrorMessage(new Error(`ENOENT ${secret}`))).toBe(
       "Required provider CLI is unavailable",
     );
+    expect(
+      publicSidecarErrorMessage(
+        new Error(`model claude-opus-4-8 not found ${secret}`),
+      ),
+    ).toBe("Provider request failed");
     for (const message of [
       publicSidecarErrorMessage(new Error(secret)),
       publicSidecarErrorMessage(new Error(`timeout ${secret}`)),

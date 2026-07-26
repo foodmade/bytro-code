@@ -491,6 +491,20 @@ pub(crate) async fn stream_chat_inner(
         sidecar_api_key
     };
 
+    eprintln!(
+        "[auth-debug][chat/stream] request_id={} agent={} platform={} model={} auth_mode={} profile_id={} base_url={} api_key={} session_present={} proxy_set={}",
+        request_id,
+        agent_type,
+        platform.as_deref().unwrap_or("(none)"),
+        resolved_model,
+        auth_mode.as_deref().unwrap_or("apiKey"),
+        profile_id.as_deref().unwrap_or("(none)"),
+        crate::anthropic::auth_debug_base_url(sidecar_base_url.as_deref().unwrap_or("")),
+        crate::anthropic::auth_debug_secret(sidecar_api_key.as_deref().unwrap_or("")),
+        session_id.is_some(),
+        proxy_url.as_deref().is_some_and(|value| !value.trim().is_empty())
+    );
+
     // Track only after all preflight and credential resolution succeeds.
     mgr.set_last_request_id(&request_id);
     mgr.track_request(&request_id, conversation_id.clone(), window_label.clone());

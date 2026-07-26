@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
-// Permission mode intent shared with the local Claude CLI adapter
+// Permission mode → SDK-native permissionMode + canUseTool mapping
 // ---------------------------------------------------------------------------
 
-import type { CanUseTool, PermissionMode } from "./claude-cli-adapter.js";
+import type { CanUseTool, PermissionMode } from "@anthropic-ai/claude-agent-sdk";
 import { randomUUID } from "node:crypto";
 import type { AskUserQuestionItem } from "./protocol.js";
 
@@ -35,12 +35,11 @@ function nextConfirmId(): string {
 }
 
 /**
- * Build the permission intent from the protocol mode string.
+ * Build SDK permission config from the permission mode string.
  *
- * The callback shape is retained for handler compatibility and direct tests.
- * The community CLI adapter cannot bridge an in-process approval callback into
- * Claude's stdio protocol, so it safely maps headless `default` to `dontAsk`.
- * Only an explicit `bypassPermissions` selection enables dangerous bypass.
+ * Uses SDK-native permissionMode values directly. AskUserQuestion and
+ * ExitPlanMode are always intercepted via canUseTool because the SDK marks
+ * them as requiring user interaction.
  *
  * @param mode - protocol permission mode string
  * @param requestId - current request ID for emitting permission_request events
@@ -114,13 +113,12 @@ export function buildPermissionConfig(
   }
 }
 
-/** Normalise legacy or unknown mode strings to a safe CLI permission mode. */
+/** Normalise legacy or unknown mode strings to valid SDK PermissionMode. */
 function toSdkMode(mode: string): PermissionMode {
   switch (mode) {
     case "bypassPermissions":
+    case "auto": // legacy
       return "bypassPermissions";
-    case "auto": // legacy: never imply dangerous bypass
-      return "default";
     case "plan":
     case "planning": // legacy
     case "deep": // deep = plan + brainstorming

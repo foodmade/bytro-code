@@ -9,6 +9,13 @@ describe("formatChatError", () => {
     expect(formatChatError(raw)).toBe(i18n.t("chat.errors.modelNotFound"));
   });
 
+  it("does not classify a provider resource miss as a missing CLI", () => {
+    expect(formatChatError("resource not found")).toBe("Provider request failed");
+    expect(formatChatError("spawn claude ENOENT")).toBe(
+      "Required provider CLI is unavailable",
+    );
+  });
+
   it("reduces unknown paths, prompts, and tokens to a fixed category", () => {
     const sentinels = [
       "/Users/private/project",

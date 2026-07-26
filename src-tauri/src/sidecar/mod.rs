@@ -447,15 +447,22 @@ impl SidecarManager {
         // Spawn stderr reader thread. Raw child output can contain prompts,
         // arguments, provider credentials, and local paths, so only fixed
         // metadata summaries cross the log, crash-buffer, or frontend boundary.
+        // Explicit auth-debug lines are assembled from redacted fields by the
+        // sidecar and are safe to pass through during authentication diagnosis.
         let stderr_buf_for_reader = stderr_buf.clone();
         std::thread::spawn(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines() {
                 match line {
                     Ok(l) => {
-                        let summary = sidecar_diagnostic_summary("sidecar.stderr", &l);
-                        log::warn!("[sidecar-stderr] {}", summary);
-                        stderr_buf_for_reader.push(summary);
+                        if l.starts_with("[auth-debug]") {
+                            log::warn!("{}", l);
+                            stderr_buf_for_reader.push(l);
+                        } else {
+                            let summary = sidecar_diagnostic_summary("sidecar.stderr", &l);
+                            log::warn!("[sidecar-stderr] {}", summary);
+                            stderr_buf_for_reader.push(summary);
+                        }
                     }
                     Err(e) => {
                         log::error!("[sidecar-stderr] read error kind={:?}", e.kind());

@@ -10,6 +10,15 @@ import { describe, expect, it, vi } from "vitest";
 import { handleClaudeInit } from "../claude-handler.js";
 import type { InitSessionCommand } from "../protocol.js";
 
+const { startupMock } = vi.hoisted(() => ({
+  startupMock: vi.fn(),
+}));
+
+vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
+  query: vi.fn(),
+  startup: startupMock,
+}));
+
 describe("Claude community initialization", () => {
   it("matches the formal prewarm flow and emits system_init before done", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "bytro-claude-init-"));
@@ -47,6 +56,26 @@ describe("Claude community initialization", () => {
     const previousCliPath = process.env.CLAUDE_CLI_PATH;
     const previousApiKey = process.env.ANTHROPIC_API_KEY;
     process.env.CLAUDE_CLI_PATH = fakeClaudePath;
+    startupMock.mockImplementation(async ({ options }) => ({
+      query: () => ({
+        async *[Symbol.asyncIterator]() {
+          yield {
+            type: "system",
+            subtype: "init",
+            tools: ["Read", "Write"],
+            mcp_servers: [{ name: "local", status: "connected" }],
+            model: "claude-test",
+            fast_mode_state: "off",
+            slash_commands: ["help", "compact"],
+          };
+        },
+        supportedCommands: async () => [
+          { name: "help", description: "" },
+          { name: "compact", description: "" },
+        ],
+      }),
+      options,
+    }));
 
     try {
       await handleClaudeInit(cmd, emit, controllers);
@@ -68,6 +97,14 @@ describe("Claude community initialization", () => {
         ],
         [{ evt: "done", id: "init-1" }],
       ]);
+      expect(startupMock).toHaveBeenCalledWith({
+        options: expect.objectContaining({
+          pathToClaudeCodeExecutable: fakeClaudePath,
+          env: expect.objectContaining({
+            ANTHROPIC_API_KEY: "sentinel-provider-key",
+          }),
+        }),
+      });
       expect(controllers.has("init-1")).toBe(false);
       expect(process.env.ANTHROPIC_API_KEY).toBe(previousApiKey);
     } finally {

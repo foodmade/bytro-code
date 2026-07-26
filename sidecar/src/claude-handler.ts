@@ -1,18 +1,18 @@
 // ---------------------------------------------------------------------------
-// Claude CLI query handler — extracted from index.ts
+// Claude Agent SDK query handler — extracted from index.ts
 // ---------------------------------------------------------------------------
 
-import { query, startup } from "./claude-cli-adapter.js";
+import { query, startup } from "@anthropic-ai/claude-agent-sdk";
 import type {
   Options,
-  StreamObserver,
+  HookCallback,
   SDKUserMessage,
   ThinkingConfig,
   EffortLevel,
   WarmQuery,
   SDKControlGetContextUsageResponse,
   Query,
-} from "./claude-cli-adapter.js";
+} from "@anthropic-ai/claude-agent-sdk";
 import type { QueryCommand, InitSessionCommand, TodoItem, ImageData, ChatMessage, SlashCommandInfo, CommandInvocationPayload } from "./protocol.js";
 import { buildPermissionConfig } from "./permissions.js";
 import type { PermissionConfig } from "./permissions.js";
@@ -25,6 +25,7 @@ import {
   computeTodoDiff,
   defaultToolDisplay,
   getContextWindowForModel,
+  buildProcessEnvWithManagedPath,
   publicSidecarErrorMessage,
   summarizeDiagnosticText,
 } from "./shared.js";
@@ -33,7 +34,6 @@ import type { EmitFn } from "./shared.js";
 import {
   acquireCredentialLock,
   applyCredentials,
-  captureClaudeProviderEnvironment,
   restoreCredentials,
 } from "./credential-strategy.js";
 import { filterValidMcpServers } from "./mcp-validator.js";
@@ -51,6 +51,15 @@ import type { SessionChannel } from "./persistent-session-registry.js";
 import { randomUUID, createHash } from "node:crypto";
 import { statSync } from "node:fs";
 import { join, dirname } from "node:path";
+
+type HookObserver = (...args: Parameters<HookCallback>) => Promise<void>;
+
+function asObservationHook(observer: HookObserver): HookCallback {
+  return async (...args) => {
+    await observer(...args);
+    return { continue: true };
+  };
+}
 
 /** Short stable hash for prompt-cache prefix diagnostics. */
 function _shortHash(s: string): string {
@@ -85,7 +94,7 @@ export interface ChannelMessage {
 
 /**
  * A message queue that bridges imperative `push()` calls with async iteration.
- * The Claude CLI adapter accepts an AsyncIterable<Message> as the prompt parameter;
+ * The Claude Agent SDK accepts an AsyncIterable<Message> as the prompt parameter;
  * by keeping this iterable alive across turns, additional user messages can be
  * injected mid-stream (e.g. via Ctrl+Enter in the UI).
  *
@@ -104,7 +113,7 @@ export class PromptChannel implements SessionChannel {
     this.idleTimeoutMs = idleTimeoutMs;
   }
 
-  /** Push a user message into the channel. If the CLI adapter is waiting, it wakes up. */
+  /** Push a user message into the channel. If the SDK is waiting, it wakes up. */
   push(
     content: string,
     images?: ReadonlyArray<{ media_type: string; data: string }>,
@@ -787,9 +796,8 @@ function buildThinkingOptions(
  * Build the SDK Options object from the query command, resolved claude path,
  * and permission configuration.
  *
- * Configures model, process settings, stream observers, MCP servers, and
- * session resume. Tool approval callbacks are intentionally not included:
- * the local CLI has no stdio bridge for an in-process `canUseTool` callback.
+ * Configures model, process settings, SDK hooks, MCP servers, permissions,
+ * and session resume.
  */
 function buildQueryOptions(
   cmd: QueryCommand,
@@ -804,10 +812,6 @@ function buildQueryOptions(
   const { cwd, systemPrompt, sessionId, forkSession, resumeSessionAt } = cmd;
 
   const id = cmd.id;
-
-  // User/project settings remain untouched. The local CLI adapter supplies a
-  // private per-process settings file whose credential env values take
-  // precedence for this launch only.
 
   const shouldEnableReasoning = cmd.platform == null || cmd.platform === "claude" || cmd.platform === "ollama";
   const options: Options = {
@@ -844,7 +848,7 @@ function buildQueryOptions(
       settings: JSON.stringify(sessionSettings),
     };
   }
-  options.env = captureClaudeProviderEnvironment();
+  options.env = buildProcessEnvWithManagedPath(undefined);
   // [fast-mode] Headless SDK mode never runs the CLI's interactive org-status
   // prefetch (KlH → $y resolution), so even an entitled (Max/paid) account has
   // $y stuck at pending/disabled, and yZ()/k6H() block fast mode → fast_mode_state
@@ -917,7 +921,7 @@ function buildQueryOptions(
     options.settingSources = [];
     // Disable file checkpointing — pure text generation never modifies files.
     options.enableFileCheckpointing = false;
-    // No tool stream observers — skip all tool-related setup.
+    // No canUseTool and no hooks — skip all tool-related setup.
   } else {
     // Use preset format to preserve Claude Code's default system prompt
     // (including CWD, tool descriptions, etc.) while appending extra context.
@@ -954,17 +958,12 @@ function buildQueryOptions(
       options.allowDangerouslySkipPermissions = true;
     }
 
-    // The local CLI cannot invoke Bytro's in-process canUseTool callback.
-    // Default mode is downgraded to dontAsk by the adapter so approval-gated
-    // tools fail closed instead of hanging on a nonexistent UI bridge.
-
-    if (cmd.dimensionPrompts) {
-      options.dimensionPrompts = cmd.dimensionPrompts;
+    if (permConfig.canUseTool) {
+      options.canUseTool = permConfig.canUseTool;
     }
 
-    // Observe already-emitted CLI stream events for UI bookkeeping. These
-    // callbacks cannot block or rewrite tool execution.
-    const subagentStartObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    // Register observation-only SDK hooks for UI bookkeeping.
+    const subagentStartObserver: HookObserver = async (input, _toolUseID, _options) => {
       if (input.hook_event_name === "SubagentStart") {
         const raw = input as Record<string, unknown>;
         const agentId = typeof raw.agent_id === "string" ? raw.agent_id : "";
@@ -986,7 +985,7 @@ function buildQueryOptions(
       }
     };
 
-    const subagentStopObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    const subagentStopObserver: HookObserver = async (input, _toolUseID, _options) => {
       if (input.hook_event_name === "SubagentStop") {
         const raw = input as Record<string, unknown>;
         const agentId = typeof raw.agent_id === "string" ? raw.agent_id : "";
@@ -1011,7 +1010,7 @@ function buildQueryOptions(
       }
     };
 
-    const todoWriteObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    const todoWriteObserver: HookObserver = async (input, _toolUseID, _options) => {
       const raw = input as Record<string, unknown>;
       const toolInput = raw.tool_input as Record<string, unknown> | undefined;
       if (Array.isArray(toolInput?.todos)) {
@@ -1023,7 +1022,7 @@ function buildQueryOptions(
       }
     };
 
-    const taskToolObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    const taskToolObserver: HookObserver = async (input, _toolUseID, _options) => {
       const raw = input as Record<string, unknown>;
       const toolName = typeof raw.tool_name === "string" ? raw.tool_name : "";
       const toolInput = raw.tool_input as Record<string, unknown> | undefined;
@@ -1041,14 +1040,15 @@ function buildQueryOptions(
       }
     };
 
-    // Capture Task metadata from the stream for later SubagentStart display.
-    // Full health-check prompts are already inlined into the first CLI stdin
-    // message by the adapter; this observer never mutates tool input.
-    const preTaskObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    // Capture Task metadata and inject health-check dimension prompts through
+    // the SDK's PreToolUse hook, matching the formal edition's execution path.
+    const dimensionPrompts =
+      cmd.dimensionPrompts as Readonly<Record<string, string>> | undefined;
+    const preTaskHook: HookCallback = async (input, _toolUseID, _options) => {
       const raw = input as Record<string, unknown>;
       const toolName = typeof raw.tool_name === "string" ? raw.tool_name : "";
       if (toolName !== "Task" && toolName !== "Agent") {
-        return;
+        return { continue: true };
       }
       const toolInput = raw.tool_input as Record<string, unknown> | undefined;
       const desc = typeof toolInput?.description === "string" ? toolInput.description : undefined;
@@ -1063,13 +1063,26 @@ function buildQueryOptions(
           pendingTaskDescriptions.set(subType, [entry]);
         }
       }
+      if (dimensionPrompts && desc && toolInput && dimensionPrompts[desc]) {
+        return {
+          continue: true,
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse" as const,
+            updatedInput: {
+              ...toolInput,
+              prompt: dimensionPrompts[desc],
+            },
+          },
+        };
+      }
+      return { continue: true };
     };
 
     // PostToolUse hook for Task — emits subagent_completed with the result text.
     // The SDK may store the actual agent output in an outputFile rather than
     // returning it inline. When outputFile is present, read the file to get
     // the real analysis result.
-    const postTaskObserver: StreamObserver = async (input, toolUseID, _options) => {
+    const postTaskObserver: HookObserver = async (input, toolUseID, _options) => {
       const raw = input as Record<string, unknown>;
       const toolName = typeof raw.tool_name === "string" ? raw.tool_name : "";
       if (toolName !== "Task" && toolName !== "Agent") {
@@ -1223,7 +1236,7 @@ function buildQueryOptions(
     // PostToolUse hook for tracking file modifications (Edit, Write).
     // Parses tool_input to extract file path and approximate diff statistics,
     // then emits a `file_changed` event for the frontend's changed-files panel.
-    const fileChangeObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    const fileChangeObserver: HookObserver = async (input, _toolUseID, _options) => {
       const raw = input as Record<string, unknown>;
       const toolName = typeof raw.tool_name === "string" ? raw.tool_name : "";
       const toolInput = raw.tool_input as Record<string, unknown> | undefined;
@@ -1271,7 +1284,7 @@ function buildQueryOptions(
     // transcript file.  We forward both as a `turn_finished` event so the
     // frontend's live reviewer can flush its per-turn file buffer and run
     // a single batch review covering everything Opus did this turn.
-    const turnFinishedObserver: StreamObserver = async (input, _toolUseID, _options) => {
+    const turnFinishedObserver: HookObserver = async (input, _toolUseID, _options) => {
       const raw = input as Record<string, unknown>;
       const lastMsg = typeof raw.last_assistant_message === "string"
         ? raw.last_assistant_message
@@ -1283,20 +1296,20 @@ function buildQueryOptions(
       });
     };
 
-    options.streamObservers = {
-      SubagentStart: [{ observers: [subagentStartObserver] }],
-      SubagentStop: [{ observers: [subagentStopObserver] }],
+    options.hooks = {
+      SubagentStart: [{ hooks: [asObservationHook(subagentStartObserver)] }],
+      SubagentStop: [{ hooks: [asObservationHook(subagentStopObserver)] }],
       PreToolUse: [
-        { matcher: "^(Task|Agent)$", observers: [preTaskObserver] },
+        { matcher: "^(Task|Agent)$", hooks: [preTaskHook] },
       ],
       PostToolUse: [
-        { matcher: "TodoWrite", observers: [todoWriteObserver] },
-        { matcher: "^(TaskCreate|TaskUpdate|TaskGet|TaskList)$", observers: [taskToolObserver] },
-        { matcher: "Edit|Write", observers: [fileChangeObserver] },
-        { matcher: "^(Task|Agent)$", observers: [postTaskObserver] },
+        { matcher: "TodoWrite", hooks: [asObservationHook(todoWriteObserver)] },
+        { matcher: "^(TaskCreate|TaskUpdate|TaskGet|TaskList)$", hooks: [asObservationHook(taskToolObserver)] },
+        { matcher: "Edit|Write", hooks: [asObservationHook(fileChangeObserver)] },
+        { matcher: "^(Task|Agent)$", hooks: [asObservationHook(postTaskObserver)] },
       ],
       TaskCreated: [{
-        observers: [async (input) => {
+        hooks: [asObservationHook(async (input) => {
           const update = updateTaskTrackerFromLifecycle(
             state.taskTrackerState,
             previousTodosRef.current,
@@ -1308,10 +1321,10 @@ function buildQueryOptions(
             state.previousTodos = update.todos;
             emit({ evt: "todo_updated", id, todos: update.todos, diff: update.diff });
           }
-        }],
+        })],
       }],
       TaskCompleted: [{
-        observers: [async (input) => {
+        hooks: [asObservationHook(async (input) => {
           const update = updateTaskTrackerFromLifecycle(
             state.taskTrackerState,
             previousTodosRef.current,
@@ -1323,9 +1336,9 @@ function buildQueryOptions(
             state.previousTodos = update.todos;
             emit({ evt: "todo_updated", id, todos: update.todos, diff: update.diff });
           }
-        }],
+        })],
       }],
-      Stop: [{ observers: [turnFinishedObserver] }],
+      Stop: [{ hooks: [asObservationHook(turnFinishedObserver)] }],
     };
 
     // Enable periodic AI-generated progress summaries for subagents (~30s interval).
@@ -2268,7 +2281,7 @@ export async function handleClaudeInit(
         : {}),
     };
 
-    options.env = captureClaudeProviderEnvironment();
+    options.env = buildProcessEnvWithManagedPath(undefined);
     if (cmd.fastMode === true) {
       options.env = {
         ...options.env,
@@ -2290,7 +2303,7 @@ export async function handleClaudeInit(
         );
       }
       if (Object.keys(valid).length > 0) {
-        options.mcpServers =
+        (options as Record<string, unknown>).mcpServers =
           process.platform === "win32"
             ? resolveWindowsMcpServers(
                 valid as Record<string, McpServerConfigRaw>,

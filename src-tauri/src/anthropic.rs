@@ -26,6 +26,32 @@ fn provider_diagnostic_id(detail: &str) -> String {
     format!("{digest:x}").chars().take(12).collect()
 }
 
+pub(crate) fn auth_debug_secret(value: &str) -> String {
+    if value.is_empty() {
+        return "(empty)".to_string();
+    }
+    format!(
+        "len={} sha256={}",
+        value.len(),
+        provider_diagnostic_id(value)
+    )
+}
+
+pub(crate) fn auth_debug_base_url(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return "(default)".to_string();
+    }
+    match Url::parse(trimmed) {
+        Ok(parsed) => format!("{}{}", parsed.origin().ascii_serialization(), parsed.path()),
+        Err(_) => format!(
+            "(invalid len={} sha256={})",
+            trimmed.len(),
+            provider_diagnostic_id(trimmed)
+        ),
+    }
+}
+
 fn public_provider_error(category: &str, detail: &str, status: Option<u16>) -> String {
     let digest = Sha256::digest(detail.as_bytes());
     log::warn!(
@@ -838,6 +864,16 @@ pub async fn test_connection(
     platform: Option<String>,
 ) -> Result<TestResult, String> {
     let model = model.unwrap_or_else(|| DEFAULT_MODEL.to_string());
+    eprintln!(
+        "[auth-debug][test] sdk=claude platform={} model={} base_url={} api_key={} proxy_set={}",
+        platform.as_deref().unwrap_or("claude"),
+        model,
+        auth_debug_base_url(&base_url),
+        auth_debug_secret(&api_key),
+        proxy_url
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+    );
 
     if api_key.is_empty() {
         return Ok(TestResult {
@@ -953,6 +989,15 @@ pub async fn test_openai_connection(
     proxy_url: Option<String>,
 ) -> Result<TestResult, String> {
     let model = model.unwrap_or_else(|| "openai/gpt-5.6-sol".to_string());
+    eprintln!(
+        "[auth-debug][test] sdk=openai-compatible model={} base_url={} api_key={} proxy_set={}",
+        model,
+        auth_debug_base_url(&base_url),
+        auth_debug_secret(&api_key),
+        proxy_url
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+    );
 
     if api_key.is_empty() {
         return Ok(TestResult {
@@ -1165,6 +1210,15 @@ pub async fn test_gemini_connection(
     proxy_url: Option<String>,
 ) -> Result<TestResult, String> {
     let model = model.unwrap_or_else(|| "gemini-2.5-flash".to_string());
+    eprintln!(
+        "[auth-debug][test] sdk=gemini model={} base_url={} api_key={} proxy_set={}",
+        model,
+        auth_debug_base_url(base_url.as_deref().unwrap_or("")),
+        auth_debug_secret(&api_key),
+        proxy_url
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+    );
 
     if api_key.is_empty() {
         return Ok(TestResult {

@@ -88,10 +88,10 @@ describe("Claude tool permission policy", () => {
     expect(bypassConfig.allowDangerouslySkipPermissions).toBe(true);
   });
 
-  it("maps legacy auto mode to safe default rather than dangerous bypass", () => {
+  it("matches the formal edition legacy auto mapping", () => {
     const config = buildPermissionConfig("auto", "req-auto", () => {});
-    expect(config.permissionMode).toBe("default");
-    expect(config.allowDangerouslySkipPermissions).toBeUndefined();
+    expect(config.permissionMode).toBe("bypassPermissions");
+    expect(config.allowDangerouslySkipPermissions).toBe(true);
   });
 
   it("intercepts AskUserQuestion and ExitPlanMode through UI confirmation", async () => {

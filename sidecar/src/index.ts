@@ -35,7 +35,7 @@ import {
   consumeWarmReuseDebug,
   setWarmSessionEndNotifier,
 } from "./persistent-session-registry.js";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 // ---- Startup: strip inherited Anthropic env vars ----
 // On developer machines, the Tauri parent process may have system-level
@@ -127,6 +127,23 @@ function logDiagnostic(eventType: string, detail: unknown): void {
 
 function log(msg: string): void {
   logDiagnostic("index.message", msg);
+}
+
+function authDebugSecret(value: string | undefined): string {
+  if (!value) return "(empty)";
+  const digest = createHash("sha256").update(value).digest("hex").slice(0, 12);
+  return `len=${value.length} sha256=${digest}`;
+}
+
+function authDebugBaseUrl(value: string | undefined): string {
+  if (!value?.trim()) return "(default)";
+  try {
+    const parsed = new URL(value);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    const digest = createHash("sha256").update(value).digest("hex").slice(0, 12);
+    return `(invalid len=${value.length} sha256=${digest})`;
+  }
 }
 
 // ---- Active query tracking ----
@@ -342,6 +359,13 @@ function main(): void {
 
     switch (cmd.cmd) {
       case "query": {
+        process.stderr.write(
+          `[auth-debug][sidecar/query] request_id=${cmd.id} agent=${cmd.agent} ` +
+          `platform=${cmd.platform ?? "(none)"} model=${cmd.model} ` +
+          `auth_mode=${cmd.authMode ?? "apiKey"} profile_id=${cmd.profileId ?? "(none)"} ` +
+          `base_url=${authDebugBaseUrl(cmd.baseUrl)} api_key=${authDebugSecret(cmd.apiKey)} ` +
+          `session_present=${cmd.sessionId !== null} proxy_set=${Boolean(cmd.proxyUrl?.trim())}\n`,
+        );
         // Check for an existing warm session for this conversation.
         // If metadata (model/platform/cwd) still matches, route the message
         // to the existing CLI process instead of spawning a new one.
