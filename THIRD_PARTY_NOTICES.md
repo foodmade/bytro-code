@@ -81,6 +81,15 @@ The upstream MIT license is reproduced in full:
 
 ## External CLI runtimes
 
+The Sidecar integrates `@anthropic-ai/claude-agent-sdk` version `0.3.198`.
+The package and its platform packages identify their license through their
+packaged README or LICENSE files rather than an SPDX identifier. Their use is
+subject to Anthropic's applicable Commercial Terms and the legal agreements
+published at <https://code.claude.com/docs/en/legal-and-compliance>. The exact
+package names, version, and declared license pointers are pinned in
+`scripts/third-party-license-policy.json`; changing any of them requires a new
+review.
+
 Claude CLI and Codex CLI are optional, user-installed third-party programs.
 They are not bundled, downloaded, updated, or sublicensed by this repository.
 Users are responsible for obtaining them from provider-authorized sources and

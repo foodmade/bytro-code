@@ -15,6 +15,7 @@ const gitCommand = process.platform === "win32" ? "git.exe" : "git";
 const requiredNoticeFiles = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"];
 const unresolvedLicensePattern = /^(?:NOASSERTION|NONE)$/i;
 const nonStandardLicensePattern = /SEE\s+LICENSE|LicenseRef-|UNLICENSED|PROPRIETARY/i;
+const reviewableLicensePointerPattern = /SEE\s+LICENSE/i;
 const reviewLicensePattern =
   /(?:^|[^A-Za-z])(?:A?GPL|LGPL|MPL|EPL|CDDL|SSPL|BUSL|BSL|EUPL|OSL)(?:-|$)|PolyForm|Commons-Clause/i;
 
@@ -99,6 +100,39 @@ function packageIdentity(entry) {
 
 function reviewKey(entry) {
   return [entry.ecosystem, entry.project, packageIdentity(entry), entry.license].join(":");
+}
+
+function verifyInstalledLicensePointer(entry, npmProjects) {
+  const pointer = /^SEE\s+LICENSE\s+IN\s+(.+)$/i.exec(entry.license)?.[1]?.trim();
+  if (!pointer || pointer !== path.basename(pointer)) {
+    throw new Error("license pointer is not a safe file name");
+  }
+
+  const project = npmProjects.find((candidate) => candidate.name === entry.project);
+  if (!project) {
+    throw new Error("npm project is unavailable");
+  }
+
+  const packageDirectory = path.join(
+    project.directory,
+    "node_modules",
+    ...entry.name.split("/"),
+  );
+  if (!fs.existsSync(packageDirectory)) {
+    // npm omits optional packages for other operating systems and architectures.
+    return;
+  }
+
+  const evidencePath = path.join(packageDirectory, pointer);
+  let evidence;
+  try {
+    evidence = fs.lstatSync(evidencePath);
+  } catch {
+    throw new Error("referenced license file is missing");
+  }
+  if (!evidence.isFile() || evidence.size === 0 || evidence.size > 1024 * 1024) {
+    throw new Error("referenced license file is not a bounded regular file");
+  }
 }
 
 function inspectSpdxDocument(document, project, scope) {
@@ -359,7 +393,16 @@ function main() {
 
     for (const entry of runtimeEntries) {
       if (isUnresolvedLicense(entry.license)) {
-        failures.push(`Unresolved runtime license: ${reviewKey(entry)}`);
+        const key = reviewKey(entry);
+        if (reviewableLicensePointerPattern.test(entry.license) && approved.has(key)) {
+          try {
+            verifyInstalledLicensePointer(entry, npmProjects);
+          } catch (error) {
+            failures.push(`Invalid approved runtime license evidence: ${key}: ${error.message}`);
+          }
+          continue;
+        }
+        failures.push(`Unresolved runtime license: ${key}`);
         continue;
       }
       if (reviewLicensePattern.test(entry.license)) {
