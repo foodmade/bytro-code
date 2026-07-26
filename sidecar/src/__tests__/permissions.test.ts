@@ -34,7 +34,6 @@ describe("Claude tool permission policy", () => {
         { subject: "Plan", description: "Plan work", taskId: "task-1" },
         {
           toolUseID: `tu-${toolName}`,
-          requestId: `sdk-${toolName}`,
           signal: new AbortController().signal,
         },
       );
@@ -60,7 +59,6 @@ describe("Claude tool permission policy", () => {
           { name: "release" },
           {
             toolUseID: `tu-${mode}-${toolName}`,
-            requestId: `sdk-${mode}-${toolName}`,
             signal: new AbortController().signal,
           },
         );
@@ -119,7 +117,6 @@ describe("Claude tool permission policy", () => {
       },
       {
         toolUseID: "tu-ask",
-        requestId: "sdk-ask",
         signal: new AbortController().signal,
       },
     );
@@ -140,7 +137,6 @@ describe("Claude tool permission policy", () => {
       { plan: "Ship it" },
       {
         toolUseID: "tu-exit",
-        requestId: "sdk-exit",
         signal: new AbortController().signal,
       },
     );
