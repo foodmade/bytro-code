@@ -126,7 +126,7 @@ export function formatShortcut(binding: ShortcutBinding): string {
 // Equality / conflict detection
 // ---------------------------------------------------------------------------
 
-export function bindingsEqual(a: ShortcutBinding, b: ShortcutBinding): boolean {
+function bindingsEqual(a: ShortcutBinding, b: ShortcutBinding): boolean {
   return (
     a.key === b.key &&
     !!a.ctrl === !!b.ctrl &&

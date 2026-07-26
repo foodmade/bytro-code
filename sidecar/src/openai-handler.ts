@@ -181,7 +181,7 @@ interface ChannelMessage {
   readonly commandInvocation?: CommandInvocationPayload;
 }
 
-export class CodexSessionChannel implements SessionChannel {
+class CodexSessionChannel implements SessionChannel {
   private _queue: ChannelMessage[] = [];
   private _resolve: ((msg: ChannelMessage | null) => void) | null = null;
   private _closed = false;

@@ -25,7 +25,7 @@ const IGNORED_DIRS = new Set([
  * Extracts the content between the opening and closing `---` delimiters.
  * Uses a lightweight parser to avoid external dependencies.
  */
-export function parseSkillMd(filePath: string): {
+function parseSkillMd(filePath: string): {
   frontmatter: SkillFrontmatter;
   content: string;
 } {

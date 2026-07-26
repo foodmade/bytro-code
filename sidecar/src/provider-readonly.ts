@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { requireRealDirectoryTree } from "./skills/fs-safe.js";
 
 export const MAX_PROVIDER_IMPORT_BYTES = 1024 * 1024;
-export const MAX_PROVIDER_DIRECTORY_ENTRIES = 4096;
+const MAX_PROVIDER_DIRECTORY_ENTRIES = 4096;
 
 interface OpenedProviderFile {
   readonly fd: number;

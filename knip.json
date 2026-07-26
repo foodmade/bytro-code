@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["index.html", "scripts/*.{cjs,js}", "src/**/*.test.{ts,tsx}", "src/**/__tests__/**/*.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "sidecar": {
+      "entry": ["src/index.ts", "src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "services/site-preview-worker": {
+      "entry": ["src/index.ts", "tests/*.mjs"],
+      "project": ["src/**/*.ts"]
+    }
+  },
+  "ignoreDependencies": ["@fontsource-variable/.*", "tailwindcss"],
+  "ignoreBinaries": ["mkfifo"],
+  "ignoreExportsUsedInFile": true,
+  "includeEntryExports": false,
+  "rules": {
+    "types": "off",
+    "duplicates": "off"
+  }
+}

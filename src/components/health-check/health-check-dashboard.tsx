@@ -378,5 +378,3 @@ function RadarChart({
     </svg>
   );
 }
-
-export { DIMENSION_COLORS };

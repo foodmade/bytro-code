@@ -2,7 +2,6 @@ export {
   getMeta,
   formatInput,
   groupToolCalls,
-  MAX_RESULT_LINES,
 } from "./tool-renderer-registry";
 
 export type {
@@ -29,6 +28,5 @@ export {
   TodoContent,
   AskUserQuestionContent,
   GroupStatusDot,
-  ImageGenContent,
   ImageGenBlock,
 } from "./tool-result-display";

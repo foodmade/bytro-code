@@ -103,7 +103,7 @@ export interface PlatformMeta {
 
 // ======================== Model Lists ========================
 
-export const CLAUDE_MODELS: readonly ModelEntry[] = [
+const CLAUDE_MODELS: readonly ModelEntry[] = [
   { id: "claude-opus-4-8", label: "Opus 4.8", tier: "flagship" },
   { id: "claude-opus-4-7", label: "Opus 4.7", tier: "flagship" },
   { id: "claude-opus-4-6", label: "Opus 4.6", tier: "flagship" },
@@ -114,7 +114,7 @@ export const CLAUDE_MODELS: readonly ModelEntry[] = [
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", tier: "fast" },
 ];
 
-export const CODEX_MODELS: readonly ModelEntry[] = [
+const CODEX_MODELS: readonly ModelEntry[] = [
   { id: "gpt-5.6-sol", label: "GPT-5.6 Sol", tier: "flagship" },
   { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", tier: "balanced" },
   { id: "gpt-5.6-luna", label: "GPT-5.6 Luna", tier: "fast" },
@@ -131,7 +131,7 @@ export function supportsCodexMaxReasoning(modelId: string): boolean {
   return /^gpt-5\.6(?:[-.].*)?$/.test(normalizedModel);
 }
 
-export const GEMINI_MODELS: readonly ModelEntry[] = [
+const GEMINI_MODELS: readonly ModelEntry[] = [
   { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", tier: "flagship" },
   { id: "gemini-3.1-flash-image-preview", label: "Gemini 3.1 Flash Image", tier: "flagship" },
   { id: "gemini-3-pro-image-preview", label: "Gemini 3 Pro Image", tier: "flagship" },
@@ -144,17 +144,17 @@ export const GEMINI_MODELS: readonly ModelEntry[] = [
   { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", tier: "fast" },
 ];
 
-export const GROK_MODELS: readonly ModelEntry[] = [
+const GROK_MODELS: readonly ModelEntry[] = [
   { id: "grok-3", label: "Grok 3", tier: "flagship" },
   { id: "grok-3-mini", label: "Grok 3 Mini", tier: "fast" },
 ];
 
-export const DEEPSEEK_MODELS: readonly ModelEntry[] = [
+const DEEPSEEK_MODELS: readonly ModelEntry[] = [
   { id: "deepseek-chat", label: "DeepSeek Chat", tier: "balanced" },
   { id: "deepseek-reasoner", label: "DeepSeek Reasoner", tier: "flagship" },
 ];
 
-export const QWEN_MODELS: readonly ModelEntry[] = [
+const QWEN_MODELS: readonly ModelEntry[] = [
   { id: "qwen3.5-plus", label: "Qwen3.5 Plus", tier: "flagship" },
   { id: "qwen3-max-2026-01-23", label: "Qwen3 Max", tier: "flagship" },
   { id: "qwen3-coder-next", label: "Qwen3 Coder Next", tier: "flagship" },
@@ -164,7 +164,7 @@ export const QWEN_MODELS: readonly ModelEntry[] = [
   { id: "glm-4.7", label: "GLM-4.7", tier: "flagship" },
 ];
 
-export const BIGMODEL_MODELS: readonly ModelEntry[] = [
+const BIGMODEL_MODELS: readonly ModelEntry[] = [
   { id: "glm-5.1", label: "GLM-5.1", tier: "flagship" },
   { id: "glm-5", label: "GLM-5", tier: "flagship" },
   { id: "glm-4.7", label: "GLM-4.7", tier: "flagship" },
@@ -175,24 +175,24 @@ export const BIGMODEL_MODELS: readonly ModelEntry[] = [
   { id: "glm-4-long", label: "GLM-4 Long", tier: "balanced" },
 ];
 
-export const MIMO_MODELS: readonly ModelEntry[] = [
+const MIMO_MODELS: readonly ModelEntry[] = [
   { id: "mimo-v2-pro", label: "MiMO v2 Pro", tier: "flagship" },
   { id: "mimo-v2-omni", label: "MiMO v2 Omni", tier: "balanced" },
 ];
 
-export const KIMI_MODELS: readonly ModelEntry[] = [
+const KIMI_MODELS: readonly ModelEntry[] = [
   { id: "kimi-k2.5", label: "Kimi K2.5", tier: "flagship" },
   { id: "kimi-k2-thinking", label: "Kimi K2 Thinking", tier: "flagship" },
 ];
 
-export const MINIMAX_MODELS: readonly ModelEntry[] = [
+const MINIMAX_MODELS: readonly ModelEntry[] = [
   { id: "MiniMax-M2.7", label: "MiniMax M2.7", tier: "flagship" },
   { id: "MiniMax-M2.7-highspeed", label: "MiniMax M2.7 Highspeed", tier: "fast" },
   { id: "MiniMax-M2.5", label: "MiniMax M2.5", tier: "balanced" },
   { id: "MiniMax-M2.5-highspeed", label: "MiniMax M2.5 Highspeed", tier: "fast" },
 ];
 
-export const OLLAMA_MODELS: readonly ModelEntry[] = [];
+const OLLAMA_MODELS: readonly ModelEntry[] = [];
 
 // ======================== Platform Registry ========================
 
@@ -528,7 +528,7 @@ export function buildProfileProxyUrl(profile: ProfileConfig | null | undefined):
   return `${proxy.mode}://${auth}${host}:${port}`;
 }
 
-export function getActiveProfile(platform: PlatformConfig | null | undefined): ProfileConfig | undefined {
+function getActiveProfile(platform: PlatformConfig | null | undefined): ProfileConfig | undefined {
   return platform?.profiles.find((profile) => profile.id === platform.activeProfileId);
 }
 
@@ -584,18 +584,6 @@ export function createDefaultPlatformConfig(platformId: PlatformId): PlatformCon
     activeModelId: meta.defaultModel,
     customModels: [],
   };
-}
-
-/** Given a model ID (e.g. "claude-opus-4-6"), find which platform it belongs to.
- *  Note: some model IDs exist in multiple platforms (e.g. glm-5 in both qwen and bigmodel).
- *  For unambiguous resolution, use `decodeConversationModel` with the compound format. */
-export function findPlatformForModel(modelId: string): PlatformId | null {
-  for (const id of ALL_PLATFORM_IDS) {
-    if (PLATFORM_REGISTRY[id].models.some((m) => m.id === modelId)) {
-      return id;
-    }
-  }
-  return null;
 }
 
 /** Encode platformId + modelId into a compound string for per-conversation storage.
@@ -682,7 +670,7 @@ export function resolveActiveCredentials(
 }
 
 /** True when an OAuth profile has sign-in metadata that indicates a usable subscription login. */
-export function isOAuthProfileConnected(
+function isOAuthProfileConnected(
   profile: ProfileConfig | null | undefined,
   now = Date.now(),
 ): boolean {

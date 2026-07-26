@@ -22,7 +22,7 @@ export function getBottomScrollTop(el: Pick<HTMLDivElement, "scrollHeight" | "cl
   return Math.max(0, el.scrollHeight - el.clientHeight);
 }
 
-export function syncScrollToBottom(el: HTMLDivElement): number {
+function syncScrollToBottom(el: HTMLDivElement): number {
   el.scrollTop = getBottomScrollTop(el);
   return el.scrollTop;
 }

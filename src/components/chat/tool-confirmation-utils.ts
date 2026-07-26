@@ -56,12 +56,12 @@ function pickString(input: Record<string, unknown>, keys: readonly string[]): st
   return "";
 }
 
-export function getDisplayFileName(filePath: string): string {
+function getDisplayFileName(filePath: string): string {
   if (!filePath) return "";
   return filePath.split(/[\\/]/).filter(Boolean).pop() ?? filePath;
 }
 
-export function getFileExtension(filePath: string): string {
+function getFileExtension(filePath: string): string {
   const fileName = getDisplayFileName(filePath);
   const dot = fileName.lastIndexOf(".");
   return dot >= 0 ? fileName.slice(dot + 1).toLowerCase() : "";

@@ -34,7 +34,7 @@ import {
 } from "./cli-process.js";
 import { buildMinimalCliEnvironment } from "./cli-environment.js";
 
-export const COMMUNITY_CLI_UNSUPPORTED = "unsupported_in_community_cli";
+const COMMUNITY_CLI_UNSUPPORTED = "unsupported_in_community_cli";
 
 export type PermissionMode =
   | "acceptEdits"
@@ -1217,14 +1217,4 @@ export function query({
   readonly options: Options;
 }): Query {
   return new LocalClaudeQuery(prompt, options);
-}
-
-export async function startup({
-  options,
-}: {
-  readonly options: Options;
-}): Promise<WarmQuery> {
-  return {
-    query: (prompt) => new LocalClaudeQuery(prompt, options),
-  };
 }

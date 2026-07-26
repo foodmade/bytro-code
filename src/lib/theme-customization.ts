@@ -285,7 +285,7 @@ function readableAccent(hex: string, bg: string, fg: string): string {
     : mix(hex, fg, 0.24);
 }
 
-export function fontStack(fontFamily: string, kind: "ui" | "code"): string {
+function fontStack(fontFamily: string, kind: "ui" | "code"): string {
   const fallback =
     kind === "ui"
       ? "system-ui, -apple-system, BlinkMacSystemFont, sans-serif"

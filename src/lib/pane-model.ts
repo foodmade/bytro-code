@@ -46,7 +46,7 @@ export function resolveGlobalModel(): ResolvedPaneModel {
   };
 }
 
-export function resolveDraftPaneModelState(paneId: SplitPaneId): DraftPaneModelState | null {
+function resolveDraftPaneModelState(paneId: SplitPaneId): DraftPaneModelState | null {
   return useSplitViewStore.getState().draftPaneModels[paneId] ?? null;
 }
 

@@ -8,7 +8,7 @@ function isSessionPane(pane: SplitPane): boolean {
   );
 }
 
-export function findPreferredSessionPaneId(): SplitPaneId | null {
+function findPreferredSessionPaneId(): SplitPaneId | null {
   const splitState = useSplitViewStore.getState();
   const activePane = splitState.activePaneId
     ? (splitState.panes.find((pane) => pane.id === splitState.activePaneId) ?? null)

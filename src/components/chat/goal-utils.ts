@@ -145,7 +145,7 @@ export function formatGoalDuration(ms: number | null | undefined): string {
   return `${seconds}s`;
 }
 
-export function formatGoalNumber(value: number | null | undefined): string {
+function formatGoalNumber(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "--";
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;

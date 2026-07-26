@@ -17,7 +17,7 @@ interface ModelProviderContext {
   readonly draftPaneModel?: DraftModelLike | null;
 }
 
-export function toAgentProviderId(
+function toAgentProviderId(
   sdk: string | null | undefined,
 ): AgentProviderId | null {
   return sdk === "claude" || sdk === "codex" ? sdk : null;

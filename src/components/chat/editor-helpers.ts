@@ -9,16 +9,16 @@
 // Constants
 // ---------------------------------------------------------------------------
 export const CHIP_ATTR = "data-file-path";
-export const CHIP_ATTR_DIR = "data-is-dir";
+const CHIP_ATTR_DIR = "data-is-dir";
 export const SKILL_CHIP_ATTR = "data-skill-name";
 export const SNIPPET_CHIP_ATTR = "data-selection-snippet-id";
-export const SNIPPET_CHIP_PATH_ATTR = "data-selection-snippet-path";
-export const SNIPPET_CHIP_LABEL_ATTR = "data-selection-snippet-label";
+const SNIPPET_CHIP_PATH_ATTR = "data-selection-snippet-path";
+const SNIPPET_CHIP_LABEL_ATTR = "data-selection-snippet-label";
 /** Mode chip — selected via the `$` quick-command menu. Mode chips are
  *  zero-width in the text stream (skipped by getEditorText) and travel as a
  *  separate `modes` list to the streaming hook, which translates each mode
  *  into a deterministic system-prompt directive. */
-export const MODE_CHIP_ATTR = "data-mode-name";
+const MODE_CHIP_ATTR = "data-mode-name";
 
 export interface DOMPos {
   node: Node;
@@ -207,7 +207,7 @@ export function getEditorTextWithFileRefs(editor: HTMLElement): string {
 // ---------------------------------------------------------------------------
 
 /** Convert a text-only offset to a DOM node + offset, skipping file chip elements */
-export function textOffsetToDOM(editor: HTMLElement, textOffset: number): DOMPos | null {
+function textOffsetToDOM(editor: HTMLElement, textOffset: number): DOMPos | null {
   return textOffsetToDOMRecursive(editor, textOffset).result;
 }
 

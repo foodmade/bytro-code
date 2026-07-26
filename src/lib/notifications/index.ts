@@ -14,11 +14,10 @@
  *     { onlyWhenUnfocused: true, channels: ["os"] }
  *   );
  */
-export { notificationManager, NotificationManager } from "./manager";
+export { notificationManager } from "./manager";
 export { OsNotificationChannel } from "./channels/os";
 export { ToastNotificationChannel } from "./channels/toast";
 export { stripMarkdown } from "./strip-markdown";
-export { playNotificationSound } from "./notification-sound";
 export type {
   INotificationChannel,
   NotificationPayload,

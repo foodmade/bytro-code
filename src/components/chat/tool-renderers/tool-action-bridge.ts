@@ -2,9 +2,7 @@
 // chat tool-renderer imports stay stable. New callers should import from
 // "@/lib/file-open" directly.
 export {
-  isAbsolutePath,
   openToolFile,
   openToolDiffTab,
-  resolveToolFilePath,
   openResolvedToolFile,
 } from "@/lib/file-open";

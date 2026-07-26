@@ -8,8 +8,8 @@ import type { NotchTokenRate, NotchUsageBreakdown } from "@/lib/notch-bridge";
 //   1. 随 NotchState 推送到灵动岛 overlay 窗口
 //   2. 写入 useTokenRateStore 供主窗口 UI(聊天输入框上方波形条)订阅
 
-export const RATE_BUCKET_MS = 1000;
-export const RATE_MAX_SAMPLES = 90;
+const RATE_BUCKET_MS = 1000;
+const RATE_MAX_SAMPLES = 90;
 
 export function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

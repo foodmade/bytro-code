@@ -6,7 +6,7 @@ import type { EditorDiffMode } from "@/stores/app-store";
 // module dependency.
 
 /** Detect absolute path: POSIX `/...` or Windows `C:\...` / `C:/...`. */
-export function isAbsolutePath(path: string): boolean {
+function isAbsolutePath(path: string): boolean {
   if (path.startsWith("/")) return true;
   if (/^[A-Za-z]:[\\/]/.test(path)) return true;
   return false;

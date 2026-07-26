@@ -2,7 +2,7 @@ export const RETIRED_GPT_FALLBACK_MODEL = "gpt-5.6-sol";
 
 const RETIRED_GPT_MODEL_PATTERN = /^gpt-5\.(?:1|2)(?:$|[-.])/i;
 
-export function getUnqualifiedModelId(modelId: string): string {
+function getUnqualifiedModelId(modelId: string): string {
   const colonIndex = modelId.lastIndexOf(":");
   const unscoped = colonIndex >= 0 ? modelId.slice(colonIndex + 1) : modelId;
   const slashIndex = unscoped.lastIndexOf("/");
@@ -36,10 +36,3 @@ export function findGptRetirementFallback<T extends { readonly id: string }>(
   );
 }
 
-export function findAvailableGptRetirementFallback<
-  T extends { readonly id: string; readonly allowTrial: boolean },
->(models: readonly T[], buy: boolean): T | undefined {
-  return findGptRetirementFallback(
-    filterRetiredGptModels(models.filter((model) => model.allowTrial || buy)),
-  );
-}

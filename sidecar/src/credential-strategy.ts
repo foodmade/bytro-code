@@ -63,17 +63,6 @@ const CREDENTIAL_KEYS = [
   "all_proxy",
 ] as const;
 
-export function captureClaudeProviderEnvironment(
-  environment: NodeJS.ProcessEnv = process.env,
-): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const key of CREDENTIAL_KEYS) {
-    const value = environment[key];
-    if (value !== undefined) result[key] = value;
-  }
-  return result;
-}
-
 const PROXY_ENV_KEYS = [
   "HTTP_PROXY",
   "HTTPS_PROXY",

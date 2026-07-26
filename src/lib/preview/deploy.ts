@@ -61,7 +61,7 @@ export const initialDeployDialogState: DeployDialogState = {
   error: null,
 };
 
-export const INVALID_SITE_ID_ERROR_CODE = "invalid-site-id" as const;
+const INVALID_SITE_ID_ERROR_CODE = "invalid-site-id" as const;
 
 export class InvalidSiteIdError extends Error {
   readonly code = INVALID_SITE_ID_ERROR_CODE;

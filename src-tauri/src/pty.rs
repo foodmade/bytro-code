@@ -238,12 +238,6 @@ impl PtyManager {
             sessions: Mutex::new(HashMap::new()),
         }
     }
-
-    /// 获取当前活跃会话数量（用于调试/监控）
-    #[allow(dead_code)]
-    pub fn session_count(&self) -> usize {
-        self.sessions.lock().map(|s| s.len()).unwrap_or(0)
-    }
 }
 
 /// 当 PtyManager 被 Drop 时（应用退出），自动清理所有会话
@@ -715,12 +709,4 @@ pub fn kill_pty(
         .map_err(|e| format!("Failed to spawn kill thread: {}", e))?;
 
     Ok(())
-}
-
-/// 列出所有活跃的会话 ID（用于调试和前端状态同步）
-#[tauri::command]
-#[allow(dead_code)]
-pub fn list_pty_sessions(pty_manager: State<'_, PtyManager>) -> Result<Vec<String>, String> {
-    let sessions = pty_manager.sessions.lock().map_err(|e| e.to_string())?;
-    Ok(sessions.keys().cloned().collect())
 }
