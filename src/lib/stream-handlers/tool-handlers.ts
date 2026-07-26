@@ -3,6 +3,7 @@ import { windowListen } from "@/lib/window-listen";
 import { useChatStore, useToolStateStore } from "@/stores";
 import { getStreamRequestContext } from "@/lib/chat-stream-registry";
 import { refreshStreamSafetyTimeout } from "@/stores/stream-state-store";
+import { trackBackgroundActivityFromToolResult } from "@/lib/background-activity";
 import { notificationManager } from "@/lib/notifications";
 import type {
   ListenerParams,
@@ -72,6 +73,15 @@ export async function registerToolHandlers(
       e.payload.tool_input,
       e.payload.display,
     );
+
+    // Background Bash tasks and ScheduleWakeup keep the session "listening"
+    // after the turn ends — track them so the status doesn't drop to idle.
+    trackBackgroundActivityFromToolResult(ctx.conversationId, {
+      toolName: e.payload.tool_name,
+      toolInput: e.payload.tool_input,
+      result: e.payload.result,
+      success: e.payload.success,
+    });
   });
 
   // ---- chat-tool-confirm -------------------------------------------------

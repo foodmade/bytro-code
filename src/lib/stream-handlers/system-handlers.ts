@@ -311,6 +311,12 @@ export async function registerSystemHandlers(params: ListenerParams): Promise<Un
         syncWriter,
         activeConvId,
       );
+      // Session fully ended — any tracked background tasks / pending wakeups
+      // died with the sidecar process, so drop the "listening" state too.
+      const endedConvId = e.payload.conversation_id ?? ctx?.conversationId;
+      if (endedConvId) {
+        useStreamStateStore.getState().clearBackgroundActivity(endedConvId);
+      }
     }
 
     if (!ctx) return;
@@ -610,6 +616,9 @@ export async function registerSystemHandlers(params: ListenerParams): Promise<Un
 
     useAgentStatusStore.getState().clearCompacting(ctx.conversationId, true);
     finalizeAgentTurnAndTodos(ctx.conversationId, activeConvId);
+    if (ctx.conversationId) {
+      useStreamStateStore.getState().clearBackgroundActivity(ctx.conversationId);
+    }
 
     const store = useChatStore.getState();
     const mid = ctx.messageId;
@@ -1160,6 +1169,11 @@ export async function registerSystemHandlers(params: ListenerParams): Promise<Un
     if (!ctx) return;
     refreshStreamSafetyTimeout();
 
+    // The background task finished — stop counting it toward "listening".
+    if (ctx.conversationId) {
+      useStreamStateStore.getState().removeBackgroundTask(ctx.conversationId, e.payload.task_id);
+    }
+
     const store = useAgentStatusStore.getState();
     const activeConvId = useConversationStore.getState().activeConversationId;
     const notification = {
@@ -1194,6 +1208,12 @@ export async function registerSystemHandlers(params: ListenerParams): Promise<Un
     if (shouldIgnore()) return;
     const ctx = getStreamRequestContext(registry, e.payload.request_id);
     if (!ctx) return;
+
+    // A new turn started — if it is the ScheduleWakeup resume, the pending
+    // wakeup is consumed; if it is a user turn, the agent will re-schedule.
+    if (ctx.conversationId) {
+      useStreamStateStore.getState().clearPendingWakeup(ctx.conversationId);
+    }
 
     const activeConvId = useConversationStore.getState().activeConversationId;
     const isBackground = ctx.conversationId != null && ctx.conversationId !== activeConvId;

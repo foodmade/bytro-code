@@ -9,7 +9,7 @@ import {
 } from "@/lib/conversation-status";
 import { findPendingConfirmation } from "@/components/chat/tool-confirmation-utils";
 
-export type ConversationStatus = "running" | "permission" | "completed" | "idle";
+export type ConversationStatus = "running" | "permission" | "listening" | "completed" | "idle";
 
 export function useConversationStatus() {
   const isStreaming = useStreamStateStore((s) => s.isStreaming);
@@ -23,6 +23,8 @@ export function useConversationStatus() {
   const snapshots = useChatStore((s) => s._snapshots);
   const pendingAskUserQuestions = useToolStateStore((s) => s.pendingAskUserQuestions);
   const completedConversationIds = useStreamStateStore((s) => s.completedConversationIds);
+  const backgroundTaskIds = useStreamStateStore((s) => s.backgroundTaskIds);
+  const pendingWakeupConversationIds = useStreamStateStore((s) => s.pendingWakeupConversationIds);
 
   const runningIds = useMemo(() => {
     return buildConversationRunningIds({
@@ -63,14 +65,28 @@ export function useConversationStatus() {
     return ids;
   }, [activeConversationId, messages, snapshots, pendingAskUserQuestions]);
 
+  /** Conversations whose turn ended but the agent is still awaiting background
+   *  tasks or a scheduled wakeup — shown as "listening" instead of "idle". */
+  const listeningIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const [convId, tasks] of backgroundTaskIds) {
+      if (tasks.size > 0) ids.add(convId);
+    }
+    for (const convId of pendingWakeupConversationIds) {
+      ids.add(convId);
+    }
+    return ids;
+  }, [backgroundTaskIds, pendingWakeupConversationIds]);
+
   const getStatus = useMemo(() => {
     return (convId: string): ConversationStatus => {
       if (permissionIds.has(convId)) return "permission";
       if (runningIds.has(convId)) return "running";
+      if (listeningIds.has(convId)) return "listening";
       if (completedConversationIds.has(convId)) return "completed";
       return "idle";
     };
-  }, [runningIds, permissionIds, completedConversationIds]);
+  }, [runningIds, permissionIds, listeningIds, completedConversationIds]);
 
   const getRunState = useMemo(() => {
     return (convId: string | null | undefined): ConversationRunState & { readonly streamElapsedMs: number } => {
@@ -112,6 +128,7 @@ export function useConversationStatus() {
 
   return {
     runningIds,
+    listeningIds,
     getStatus,
     isActiveConversationStreaming: activeRunState.isRunning,
     getRunState,

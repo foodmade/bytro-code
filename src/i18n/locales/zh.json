@@ -1200,6 +1200,7 @@
     "newSession": "新建会话",
     "closeTab": "关闭标签",
     "running": "运行中",
+    "listening": "后台监听中",
     "permissionRequired": "确认",
     "completed": "已完成"
   },
