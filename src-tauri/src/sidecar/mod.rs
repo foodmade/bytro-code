@@ -736,16 +736,6 @@ impl SidecarManager {
         })
     }
 
-    /// Find the window_label for an active request (used for targeted event routing).
-    #[allow(dead_code)]
-    pub(crate) fn find_window_for_request(&self, request_id: &str) -> Option<String> {
-        self.active_requests.lock().ok().and_then(|guard| {
-            guard
-                .get(request_id)
-                .and_then(|info| info.window_label.clone())
-        })
-    }
-
     fn shutdown(&self) {
         // Take the process out under lock, then handle sleep+kill outside
         // to avoid holding the Mutex for 500ms.

@@ -31,7 +31,7 @@ const TASK_TOOL_NAMES = new Set([
   "TaskList",
 ]);
 
-export function isTaskTrackerTool(toolName: string): boolean {
+function isTaskTrackerTool(toolName: string): boolean {
   return TASK_TOOL_NAMES.has(toolName);
 }
 

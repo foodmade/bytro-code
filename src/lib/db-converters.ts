@@ -65,7 +65,7 @@ export function parseTodoStatus(status: string): TodoItem["status"] {
 }
 
 /** Convert a raw DB todo row to a typed TodoItem. */
-export function dbTodoToTodoItem(t: DbTodoRow): TodoItem {
+function dbTodoToTodoItem(t: DbTodoRow): TodoItem {
   return {
     content: t.content,
     status: parseTodoStatus(t.status),

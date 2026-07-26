@@ -61,7 +61,7 @@ interface SkillsQuickMenuProps {
   readonly onClose: () => void;
 }
 
-export const SkillsQuickMenu = memo(function SkillsQuickMenu({
+const SkillsQuickMenu = memo(function SkillsQuickMenu({
   provider,
   onSelect,
   onClose,

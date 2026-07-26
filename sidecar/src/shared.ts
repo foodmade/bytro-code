@@ -18,7 +18,7 @@ import { execFileSync } from "node:child_process";
 
 export type EmitFn = (evt: object) => void;
 
-export const MAX_TOOL_OUTPUT_LENGTH = 4000;
+const MAX_TOOL_OUTPUT_LENGTH = 4000;
 
 export type ToolDisplayStatus = "success" | "warning" | "error";
 export type ToolDisplaySeverity = "info" | "warning" | "error";
@@ -38,40 +38,10 @@ export function defaultToolDisplay(success: boolean): ToolDisplayMeta {
   return success ? makeToolDisplay("success") : makeToolDisplay("error");
 }
 
-export function prependPathDirsToEnv(
-  env: Record<string, string | undefined>,
-  dirs: ReadonlyArray<string> | undefined,
-): void {
-  const validDirs = (dirs ?? []).filter((dir) => dir && existsSync(dir));
-  if (validDirs.length === 0) return;
-
-  const sep = process.platform === "win32" ? ";" : ":";
-  const pathKeys = Object.keys(env).filter((key) => key.toLowerCase() === "path");
-  const preferredPathKey =
-    pathKeys.find((key) => key === (process.platform === "win32" ? "Path" : "PATH")) ??
-    pathKeys[0] ??
-    "PATH";
-  const current = pathKeys
-    .map((key) => env[key])
-    .filter((value): value is string => Boolean(value))
-    .join(sep);
-  for (const key of pathKeys) {
-    if (key !== preferredPathKey) {
-      delete env[key];
-    }
-  }
-  const pathKey = preferredPathKey;
-  env[pathKey] = `${validDirs.join(sep)}${current ? sep + current : ""}`;
-}
-
 export function buildProcessEnvWithManagedPath(
   _dirs: ReadonlyArray<string> | undefined,
 ): Record<string, string | undefined> {
   return { ...process.env };
-}
-
-export function quotePosixShellArg(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,10 +119,6 @@ function appendSafeDebugLine(line: string): void {
     _flushTimer = setTimeout(flushWriteBuffer, 500);
     _flushTimer.unref();
   }
-}
-
-export function appendToDebugLog(line: string): void {
-  appendSafeDebugLine(summarizeDiagnosticText(line, "external"));
 }
 
 export interface LeveledLogger {

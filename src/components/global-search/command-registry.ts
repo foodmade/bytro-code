@@ -13,7 +13,7 @@ export interface CommandDefinition {
   readonly action: () => void;
 }
 
-export function getCommandDefinitions(): ReadonlyArray<CommandDefinition> {
+function getCommandDefinitions(): ReadonlyArray<CommandDefinition> {
   return [
     {
       id: "new-session",

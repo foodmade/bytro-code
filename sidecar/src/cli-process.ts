@@ -17,7 +17,7 @@ function escapeWindowsCmdCommand(value: string): string {
   return value.replace(WINDOWS_CMD_META_CHARS, "^$1");
 }
 
-export function escapeWindowsCmdArgument(value: string): string {
+function escapeWindowsCmdArgument(value: string): string {
   let escaped = value.replace(/(?=(\\+?)?)\1"/g, '$1$1\\"');
   escaped = escaped.replace(/(?=(\\+?)?)\1$/, "$1$1");
   escaped = `"${escaped}"`;

@@ -22,7 +22,7 @@ import type {
 import { playNotificationSound } from "./notification-sound";
 import { useSettingsStore } from "@/stores/settings-store";
 
-export class NotificationManager {
+class NotificationManager {
   private readonly registrations = new Map<string, ChannelRegistration>();
 
   /**

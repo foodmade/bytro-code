@@ -3,7 +3,7 @@
  * application credentials or runtime projections.
  */
 
-export const SAFE_OS_ENV_KEYS = [
+const SAFE_OS_ENV_KEYS = [
   "PATH",
   "Path",
   "PATHEXT",

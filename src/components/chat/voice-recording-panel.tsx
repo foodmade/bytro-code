@@ -11,7 +11,7 @@ import { Paperclip, Code, Mic, Settings } from "lucide-react";
 // ---------------------------------------------------------------------------
 
 /** Format duration in mm:ss */
-export function formatVoiceDuration(ms: number): string {
+function formatVoiceDuration(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
@@ -26,7 +26,7 @@ export function formatVoiceDuration(ms: number): string {
 
 const BAR_COUNT = 40;
 
-export const VoiceWaveform = memo(function VoiceWaveform({
+const VoiceWaveform = memo(function VoiceWaveform({
   registerBar,
 }: {
   readonly registerBar: (index: number, el: HTMLElement | null) => void;

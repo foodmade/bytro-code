@@ -8,7 +8,6 @@ const TRAY_CONVERSATION_PREFIX: &str = "conversation:";
 
 mod anthropic;
 pub mod bytro_home;
-mod config;
 pub mod constants;
 mod deploy;
 mod fs_utils;

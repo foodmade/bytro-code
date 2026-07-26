@@ -942,7 +942,7 @@ interface ImageContextMenuState {
   readonly path: string;
 }
 
-export function ImageGenContent({ result }: { readonly result: string }) {
+function ImageGenContent({ result }: { readonly result: string }) {
   const { t } = useTranslation();
   const images = useMemo(() => extractGeneratedImages(result), [result]);
   const [dataUrls, setDataUrls] = useState<Record<string, string>>({});

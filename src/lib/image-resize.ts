@@ -7,7 +7,7 @@
  */
 
 /** Claude API recommended optimal longest-edge size (safely below 2000px hard limit). */
-export const IMAGE_MAX_DIMENSION = 1568;
+const IMAGE_MAX_DIMENSION = 1568;
 
 export interface ResizedImage {
   /** Base64 string WITHOUT the `data:` prefix. */

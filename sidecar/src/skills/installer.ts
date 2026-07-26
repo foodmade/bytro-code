@@ -93,7 +93,7 @@ export async function installSkill(
 /**
  * Install multiple skills from the same repo (shares a single clone).
  */
-export async function installSkillsFromRepo(
+async function installSkillsFromRepo(
   repoUrl: string,
   skillNames: ReadonlyArray<string>,
 ): Promise<ReadonlyArray<InstalledSkillMeta>> {

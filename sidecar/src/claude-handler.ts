@@ -3437,7 +3437,7 @@ export function resolveWindowsMcpServer(
 /**
  * Resolve all MCP server configs for Windows.
  */
-export function resolveWindowsMcpServers(
+function resolveWindowsMcpServers(
   servers: Record<string, McpServerConfigRaw>,
   environment: NodeJS.ProcessEnv = process.env,
 ): Record<string, McpServerConfigRaw> {

@@ -59,7 +59,7 @@ function loadDraft(conversationId: string): string {
 }
 
 /** Clear the stored draft for a conversation (called after sending). */
-export function clearDraft(conversationId: string): void {
+function clearDraft(conversationId: string): void {
   _inputDrafts.delete(conversationId);
 }
 

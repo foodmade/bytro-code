@@ -16,7 +16,7 @@ import { useAutoScroll, useChatStreaming } from "@/hooks";
 // System prompt & initial message builders (extracted from old discussion-panel)
 // ---------------------------------------------------------------------------
 
-export function buildIdeaSystemPrompt(idea: Idea): string {
+function buildIdeaSystemPrompt(idea: Idea): string {
   return `# Discussion Mode — Brainstorming & Requirements Research
 
 You are operating in **Discussion Mode**, a dedicated space for idea exploration, brainstorming, and collaborative thinking. You are NOT in a coding session. Your purpose here is to be a thought partner — helping the user think deeply, challenge assumptions, and arrive at a well-considered plan.

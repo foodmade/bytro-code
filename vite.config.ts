@@ -54,8 +54,9 @@ export default defineConfig(async ({ mode }) => ({
   },
 
   build: {
-    // Monaco TS worker is ~6.7MB and some feature chunks can top 300KB.
-    // Raise the limit to silence noisy warnings but still catch accidental 1MB+ chunks.
+    // The CodeMirror editor chunk exceeds the 500KB default and some feature
+    // chunks top 300KB. Raise the limit to silence noisy warnings while still
+    // catching accidental 1MB+ chunks.
     chunkSizeWarningLimit: 1000,
     // Skip gzip size reporting during build — speeds up builds noticeably on large projects.
     reportCompressedSize: false,

@@ -159,7 +159,7 @@ const DIMENSION_KEYWORDS: Record<DimensionId, ReadonlyArray<string>> = {
 
 // ---- Helpers ----
 
-export function matchDimension(description: string): DimensionId | null {
+function matchDimension(description: string): DimensionId | null {
   const lower = description.toLowerCase();
   for (const [id, keywords] of Object.entries(DIMENSION_KEYWORDS)) {
     if (keywords.some((kw) => lower.includes(kw.toLowerCase()))) {
@@ -169,7 +169,7 @@ export function matchDimension(description: string): DimensionId | null {
   return null;
 }
 
-export function parseDimensionResult(result: string): DimensionResult | null {
+function parseDimensionResult(result: string): DimensionResult | null {
   // The Task tool wraps agent output in a JSON structure like:
   //   [{"type":"text","text":"...\n```\n{\"score\":75,...}\n```"}],"totalDurationMs":...
   // Two challenges:

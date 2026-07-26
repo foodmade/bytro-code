@@ -11,21 +11,8 @@ export type {
 } from "./types.js";
 
 export {
-  getSkillsDir,
-  getManifestPath,
-  ensureSkillsDir,
-  readManifest,
-  writeManifest,
-} from "./manifest.js";
-
-export { normalizeGitUrl, cloneRepoShallow, getRepoHeadHash } from "./git-ops.js";
-
-export { parseSkillMd, scanForSkills } from "./scanner.js";
-
-export {
   discoverSkillsFromRepo,
   installSkill,
-  installSkillsFromRepo,
   installSkillsFromClone,
   removeSkill,
   updateSkill,

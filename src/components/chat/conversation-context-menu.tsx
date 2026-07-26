@@ -64,8 +64,6 @@ function buildConversationContextMenuItems(
   ];
 }
 
-// Compatibility with the legacy component export keeps Vite HMR from crashing on stale imports.
-// eslint-disable-next-line react-refresh/only-export-components
 export function popupConversationContextMenu({
   menuId,
   conversation,

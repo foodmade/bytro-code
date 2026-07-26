@@ -16,7 +16,7 @@ export interface AgentConfig {
   readonly brandColor: string;
 }
 
-export const FALLBACK_CONFIG: AgentConfig = {
+const FALLBACK_CONFIG: AgentConfig = {
   label: "Agent",
   avatar: "?",
   avatarBg: "#1A1A1A",
@@ -105,7 +105,7 @@ export function resolveAgentConfig(role: AgentRole, modelTag?: string): AgentCon
   return base;
 }
 
-export const AGENT_CONFIG: Partial<Record<AgentRole, AgentConfig>> = {
+const AGENT_CONFIG: Partial<Record<AgentRole, AgentConfig>> = {
   user: {
     label: "You",
     avatar: "Y",

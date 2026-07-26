@@ -134,7 +134,7 @@ export async function cloneRepoShallow(repoUrl: string, targetDir: string): Prom
 }
 
 /** Get the HEAD commit hash of a local git repository. */
-export async function getRepoHeadHash(repoDir: string): Promise<string> {
+async function getRepoHeadHash(repoDir: string): Promise<string> {
   try {
     const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
       cwd: repoDir,
