@@ -19,12 +19,22 @@ type FilterType = "all" | "starred" | "archived";
 // ── Row Status Indicator ────────────────────────────────────────────
 
 function RowStatusIndicator({ status }: { readonly status: ConversationStatus }) {
+  const { t } = useTranslation();
   if (status === "running") {
     return (
       <span className="session-tab-pulse-dots">
         <span className="session-tab-pulse-dot green" style={{ animationDelay: "0ms" }} />
         <span className="session-tab-pulse-dot green" style={{ animationDelay: "150ms" }} />
         <span className="session-tab-pulse-dot green" style={{ animationDelay: "300ms" }} />
+      </span>
+    );
+  }
+  if (status === "listening") {
+    return (
+      <span className="session-tab-pulse-dots" title={t("sessionTab.listening")}>
+        <span className="session-tab-pulse-dot blue slow" style={{ animationDelay: "0ms" }} />
+        <span className="session-tab-pulse-dot blue slow" style={{ animationDelay: "400ms" }} />
+        <span className="session-tab-pulse-dot blue slow" style={{ animationDelay: "800ms" }} />
       </span>
     );
   }

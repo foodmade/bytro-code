@@ -16,6 +16,20 @@ const STREAM_SAFETY_TIMEOUT_MS = 15 * 60 * 1000;
 let _phaseFallbackTimerId: ReturnType<typeof setTimeout> | null = null;
 const PHASE_FALLBACK_MS = 3_000;
 
+// Per-conversation expiry timers for pending ScheduleWakeup marks. The wakeup
+// normally clears via chat-new-turn when the resumed turn starts; the timer is
+// a leak guard for wakeups that never fire (sidecar died, session evicted).
+const _wakeupExpiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const WAKEUP_EXPIRY_BUFFER_MS = 90_000;
+
+function clearWakeupExpiryTimer(conversationId: string) {
+  const timer = _wakeupExpiryTimers.get(conversationId);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    _wakeupExpiryTimers.delete(conversationId);
+  }
+}
+
 export type StreamPhase = "connecting" | "waiting" | "thinking" | null;
 
 function clearPhaseFallbackTimer() {
@@ -82,6 +96,14 @@ interface StreamState {
   readonly streamPhase: StreamPhase;
   /** Conversation IDs whose tasks just completed (for tab shimmer effect). */
   readonly completedConversationIds: ReadonlySet<string>;
+  /**
+   * Tracked background-task IDs per conversation (e.g. run_in_background Bash).
+   * Non-empty ⇒ the turn ended but the agent is still awaiting task results,
+   * so the conversation shows as "listening" instead of "idle".
+   */
+  readonly backgroundTaskIds: ReadonlyMap<string, ReadonlySet<string>>;
+  /** Conversations with a pending ScheduleWakeup — the agent will resume on its own. */
+  readonly pendingWakeupConversationIds: ReadonlySet<string>;
   readonly setStreaming: (streaming: boolean) => void;
   readonly setStreamingMessageId: (id: string | null) => void;
   readonly setStreamingConversationId: (conversationId: string | null) => void;
@@ -93,6 +115,16 @@ interface StreamState {
   readonly markConversationCompleted: (id: string) => void;
   /** Clear the completed mark for a conversation (on tab click). */
   readonly clearConversationCompleted: (id: string) => void;
+  /** Track a background task for a conversation (idempotent). */
+  readonly addBackgroundTask: (conversationId: string, taskId: string) => void;
+  /** Untrack a background task (its task-notification arrived). */
+  readonly removeBackgroundTask: (conversationId: string, taskId: string) => void;
+  /** Mark a pending ScheduleWakeup; auto-expires after delayMs + buffer. */
+  readonly setPendingWakeup: (conversationId: string, delayMs: number) => void;
+  /** Clear the pending-wakeup mark (the resumed turn started, or it expired). */
+  readonly clearPendingWakeup: (conversationId: string) => void;
+  /** Drop all background-activity tracking for a conversation (session ended / error). */
+  readonly clearBackgroundActivity: (conversationId: string) => void;
   /** Restore full stream state from a conversation snapshot (no side-effects). */
   readonly restoreStreamState: (state: {
     isStreaming: boolean;
@@ -125,6 +157,8 @@ export const useStreamStateStore = create<StreamState>((set, get) => ({
   retryReason: null,
   streamPhase: null,
   completedConversationIds: new Set<string>(),
+  backgroundTaskIds: new Map<string, ReadonlySet<string>>(),
+  pendingWakeupConversationIds: new Set<string>(),
   setStreaming: (streaming) => {
     if (streaming) {
       set({
@@ -206,6 +240,56 @@ export const useStreamStateStore = create<StreamState>((set, get) => ({
     const next = new Set(prev);
     next.delete(id);
     set({ completedConversationIds: next });
+  },
+  addBackgroundTask: (conversationId, taskId) => {
+    const prev = get().backgroundTaskIds;
+    if (prev.get(conversationId)?.has(taskId)) return;
+    const next = new Map(prev);
+    next.set(conversationId, new Set(prev.get(conversationId)).add(taskId));
+    set({ backgroundTaskIds: next });
+  },
+  removeBackgroundTask: (conversationId, taskId) => {
+    const prev = get().backgroundTaskIds;
+    const tasks = prev.get(conversationId);
+    if (!tasks?.has(taskId)) return;
+    const next = new Map(prev);
+    const nextTasks = new Set(tasks);
+    nextTasks.delete(taskId);
+    if (nextTasks.size === 0) {
+      next.delete(conversationId);
+    } else {
+      next.set(conversationId, nextTasks);
+    }
+    set({ backgroundTaskIds: next });
+  },
+  setPendingWakeup: (conversationId, delayMs) => {
+    clearWakeupExpiryTimer(conversationId);
+    _wakeupExpiryTimers.set(
+      conversationId,
+      setTimeout(() => {
+        _wakeupExpiryTimers.delete(conversationId);
+        get().clearPendingWakeup(conversationId);
+      }, delayMs + WAKEUP_EXPIRY_BUFFER_MS),
+    );
+    const prev = get().pendingWakeupConversationIds;
+    if (prev.has(conversationId)) return;
+    set({ pendingWakeupConversationIds: new Set(prev).add(conversationId) });
+  },
+  clearPendingWakeup: (conversationId) => {
+    clearWakeupExpiryTimer(conversationId);
+    const prev = get().pendingWakeupConversationIds;
+    if (!prev.has(conversationId)) return;
+    const next = new Set(prev);
+    next.delete(conversationId);
+    set({ pendingWakeupConversationIds: next });
+  },
+  clearBackgroundActivity: (conversationId) => {
+    get().clearPendingWakeup(conversationId);
+    const prev = get().backgroundTaskIds;
+    if (!prev.has(conversationId)) return;
+    const next = new Map(prev);
+    next.delete(conversationId);
+    set({ backgroundTaskIds: next });
   },
   resetStreamState: () => {
     clearElapsedTimer();
