@@ -32,7 +32,11 @@ describe("Claude tool permission policy", () => {
       const result = await config.canUseTool?.(
         toolName,
         { subject: "Plan", description: "Plan work", taskId: "task-1" },
-        { toolUseID: `tu-${toolName}`, signal: new AbortController().signal },
+        {
+          toolUseID: `tu-${toolName}`,
+          requestId: `sdk-${toolName}`,
+          signal: new AbortController().signal,
+        },
       );
 
       expect(result).toEqual({
@@ -54,7 +58,11 @@ describe("Claude tool permission policy", () => {
         const pending = config.canUseTool?.(
           toolName,
           { name: "release" },
-          { toolUseID: `tu-${mode}-${toolName}`, signal: new AbortController().signal },
+          {
+            toolUseID: `tu-${mode}-${toolName}`,
+            requestId: `sdk-${mode}-${toolName}`,
+            signal: new AbortController().signal,
+          },
         );
 
         await Promise.resolve();
@@ -109,7 +117,11 @@ describe("Claude tool permission policy", () => {
           options: [{ label: "Yes", description: "Proceed" }],
         }],
       },
-      { toolUseID: "tu-ask", signal: new AbortController().signal },
+      {
+        toolUseID: "tu-ask",
+        requestId: "sdk-ask",
+        signal: new AbortController().signal,
+      },
     );
     await Promise.resolve();
     expect(emitted[0]).toMatchObject({
@@ -126,7 +138,11 @@ describe("Claude tool permission policy", () => {
     const exitPending = config.canUseTool?.(
       "ExitPlanMode",
       { plan: "Ship it" },
-      { toolUseID: "tu-exit", signal: new AbortController().signal },
+      {
+        toolUseID: "tu-exit",
+        requestId: "sdk-exit",
+        signal: new AbortController().signal,
+      },
     );
     await Promise.resolve();
     expect(emitted[1]).toMatchObject({

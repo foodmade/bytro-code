@@ -81,7 +81,7 @@ The upstream MIT license is reproduced in full:
 
 ## External CLI runtimes
 
-The Sidecar integrates `@anthropic-ai/claude-agent-sdk` version `0.3.198`.
+The Sidecar integrates `@anthropic-ai/claude-agent-sdk` version `0.3.220`.
 The package and its platform packages identify their license through their
 packaged README or LICENSE files rather than an SPDX identifier. Their use is
 subject to Anthropic's applicable Commercial Terms and the legal agreements
