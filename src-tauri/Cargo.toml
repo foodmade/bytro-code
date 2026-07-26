@@ -64,7 +64,7 @@ whisper-rs = "0.13"
 
 [target.'cfg(windows)'.dependencies]
 encoding_rs = "0.8"
-windows-sys = { version = "0.59", features = [
+windows-sys = { version = "0.61", features = [
     "Win32_NetworkManagement_IpHelper",
     "Win32_Networking_WinSock",
     "Win32_System_Diagnostics_ToolHelp",
