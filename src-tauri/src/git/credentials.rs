@@ -97,13 +97,10 @@ fn parse_credential_url(url: &str) -> (String, String, String) {
 /// - `"host:<host>"` → token / password
 /// - `"host-username:<host>"` → username (defaults to `git` if absent)
 fn match_platform_token(url: &str, tokens: &HashMap<String, String>) -> Option<(String, String)> {
-    let host = if let Some(rest) = url.strip_prefix("https://") {
-        rest.split('/').next().unwrap_or("")
-    } else if let Some(rest) = url.strip_prefix("http://") {
-        rest.split('/').next().unwrap_or("")
-    } else {
-        return None;
-    };
+    let rest = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))?;
+    let host = rest.split('/').next().unwrap_or("");
 
     // Strip optional username@ prefix and port (e.g. "user@github.com:443").
     let host = host

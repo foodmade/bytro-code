@@ -7,10 +7,15 @@
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
+#[cfg(target_os = "macos")]
 const DEFAULT_NOTCH_WIDTH: f64 = 220.0;
+#[cfg(target_os = "macos")]
 const MIN_NOTCH_WIDTH: f64 = 160.0;
+#[cfg(target_os = "macos")]
 const MAX_NOTCH_WIDTH: f64 = 320.0;
+#[cfg(target_os = "macos")]
 const ACTIVE_SIDE_WIDTH: f64 = 118.0;
+#[cfg(target_os = "macos")]
 const DEFAULT_OVERLAY_HEIGHT: f64 = 44.0;
 
 #[derive(Debug, Clone, Serialize)]
@@ -100,6 +105,7 @@ fn on_main_thread_blocking<T: Send + 'static>(
         .map_err(|e| format!("failed to receive notch main-thread result: {e}"))
 }
 
+#[cfg(target_os = "macos")]
 fn normalized_notch_width(metrics: &NotchMetrics) -> f64 {
     if !metrics.has_notch
         || metrics.notch_width < MIN_NOTCH_WIDTH
@@ -111,6 +117,7 @@ fn normalized_notch_width(metrics: &NotchMetrics) -> f64 {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn default_collapsed_bounds(metrics: &NotchMetrics) -> (f64, f64, f64, f64) {
     let width = normalized_notch_width(metrics) + ACTIVE_SIDE_WIDTH * 2.0;
     let height = metrics.safe_area_top.max(DEFAULT_OVERLAY_HEIGHT);

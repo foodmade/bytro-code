@@ -58,7 +58,7 @@ pub(crate) fn harden_windows_private_acl(path: &Path, is_directory: bool) -> Res
     }
 
     let word_bytes = std::mem::size_of::<usize>();
-    let mut token_buffer = vec![0_usize; token_bytes as usize.div_ceil(word_bytes)];
+    let mut token_buffer = vec![0_usize; (token_bytes as usize).div_ceil(word_bytes)];
     if unsafe {
         GetTokenInformation(
             token,
