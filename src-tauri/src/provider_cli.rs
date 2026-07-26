@@ -520,10 +520,7 @@ fn run_command_with_timeout(mut command: Command, timeout: Duration) -> Result<O
 fn drain_bounded(reader: &mut impl Read) -> Vec<u8> {
     let mut captured = Vec::new();
     let mut chunk = [0_u8; 8192];
-    loop {
-        let Ok(count) = reader.read(&mut chunk) else {
-            break;
-        };
+    while let Ok(count) = reader.read(&mut chunk) {
         if count == 0 {
             break;
         }
