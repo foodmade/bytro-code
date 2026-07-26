@@ -1,8 +1,32 @@
 # Provider Configuration
 
-Community Edition uses credentials, endpoints, and local runtimes supplied by
-the user. It does not provide Bytro official models or a shared credential
-pool.
+Bytro ships no models and no credentials of its own. Every model call uses an
+endpoint and key that you configure.
+
+## Built-in providers
+
+These providers come preconfigured — pick one, paste a key, and go. The base
+URL is filled in for you and can be overridden.
+
+| Provider     | Vendor    | Default base URL                                        | Auth        |
+| ------------ | --------- | ------------------------------------------------------- | ----------- |
+| **Claude**   | Anthropic | `https://api.anthropic.com`                             | API key / OAuth |
+| **Codex**    | OpenAI    | `https://api.openai.com/v1`                             | API key / OAuth |
+| **Gemini**   | Google    | *(SDK default)*                                         | API key     |
+| **DeepSeek** | DeepSeek  | `https://api.deepseek.com`                              | API key     |
+| **Qwen**     | Alibaba   | `https://dashscope.aliyuncs.com/compatible-mode/v1`     | API key     |
+| **BigModel** | 智谱 Zhipu | `https://open.bigmodel.cn/api/paas/v4`                 | API key     |
+| **Kimi**     | Moonshot  | `https://api.kimi.com/coding/`                          | API key     |
+| **MiniMax**  | MiniMax   | `https://api.minimaxi.com/v1`                           | API key     |
+| **MiMO**     | Xiaomi    | `https://api.xiaomimimo.com/v1`                         | API key     |
+| **Ollama**   | local     | `http://localhost:11434`                                | none        |
+| **Grok**     | xAI       | `https://api.x.ai/v1`                                   | *(disabled in this build)* |
+
+Any other OpenAI-compatible service works too — see
+[OpenAI-compatible endpoint](#openai-compatible-endpoint) below.
+
+The provider list and its pinned model names live in
+[`src/lib/platform-config.ts`](../src/lib/platform-config.ts).
 
 ## Supported connection patterns
 
@@ -14,27 +38,38 @@ available on the system `PATH`. The CLI settings page shows what the
 application detects. Provider-owned login performed by that CLI is separate
 from a Bytro account.
 
-#### Claude CLI
+#### How Bytro finds a runtime
 
-Install Claude CLI yourself from an Anthropic-authorized source, review
-Anthropic's applicable license and service terms, and complete any
-CLI-owned authentication required by that executable. The repository does not
-bundle, sublicense, download, or update Claude CLI.
+For Claude and Codex, Bytro resolves an executable in this order:
 
-#### Codex CLI
+1. **Explicit path** — `CLAUDE_CLI_PATH` / `CODEX_CLI_PATH`, or the path set on
+   the CLI settings page.
+2. **Private managed install** — a version-pinned copy under
+   `~/.bytro-community/cli/<provider>/<version>/`.
+3. **System `PATH`**.
+4. If none of the above yields a working executable, Bytro installs the pinned
+   package from the public npm registry into the private directory in step 2.
 
-Install Codex CLI yourself from an OpenAI-authorized source and complete any
-CLI-owned authentication required by that executable. The repository does not
-bundle, download, or update Codex CLI. The upstream Codex CLI source is
-Apache-2.0 licensed; provider accounts and hosted model use remain subject to
-OpenAI's applicable service terms.
+Step 4 runs `npm install --ignore-scripts` against
+`@anthropic-ai/claude-agent-sdk-<platform>` or `@openai/codex@<version>-<platform>`.
+Versions are pinned at build time from [`sidecar/package.json`](../sidecar/package.json).
+The install writes only inside `~/.bytro-community/cli/`, never modifies a
+system-wide installation, and never contacts a Bytro-operated server. It is
+best-effort at startup and retried when a session needs the runtime.
 
-For both CLIs, Bytro only resolves an explicit executable path or the system
-`PATH`. Absence of a CLI produces a local configuration error rather than a
-managed download. Bytro does not directly rewrite or delete provider-owned
-configuration. The CLI process itself may update its own authentication,
-session, cache, or history files while handling a user-initiated session; that
-behavior belongs to the provider CLI and its applicable terms.
+**To prevent step 4 entirely**, set the explicit path environment variable to
+your own installation. There is currently no in-app toggle to disable it —
+if you need one, please open an issue.
+
+Gemini and all OpenAI-compatible providers do not use this path at all.
+
+#### Provider-owned configuration
+
+Bytro does not rewrite or delete provider-owned configuration. The provider
+runtime itself may update its own authentication, session, cache, or history
+files while handling a session you started; that behavior belongs to the
+provider and its applicable terms. Provider accounts and hosted model use
+remain subject to Anthropic's and OpenAI's respective service terms.
 
 ### API key profile
 

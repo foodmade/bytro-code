@@ -47,7 +47,7 @@ jobs:
         run: npm run check:community
 
       - name: Lint public application sources
-        run: npm exec -- eslint src sidecar/src services/site-preview-worker/src --max-warnings 135
+        run: npm run lint:ci
 
       - name: Run frontend tests
         run: npm test

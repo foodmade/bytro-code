@@ -12,8 +12,10 @@ until a supported release line is announced here.
 
 ## Report a vulnerability
 
-Use the repository's private vulnerability reporting or Security Advisory
-facility. Include:
+Report privately through GitHub Security Advisories:
+**<https://github.com/foodmade/bytro-code/security/advisories/new>**
+
+Do not open a public issue for an unpatched vulnerability. Include:
 
 - affected commit or version;
 - operating system and architecture;

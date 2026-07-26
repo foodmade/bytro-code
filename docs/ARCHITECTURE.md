@@ -141,11 +141,18 @@ The runtime resolution contract is:
 ```text
 explicit local path/profile
   > supported environment configuration
+  > private pinned install under ~/.bytro-community/cli   (Claude and Codex only)
   > system PATH
+  > install pinned package from public npm  (Claude and Codex only)
   > configuration error
 ```
 
-There is no Bytro credential or managed-download fallback. Provider-owned
+For Claude and Codex, a missing runtime is resolved by installing a
+build-time-pinned package from the public npm registry into a private
+per-user directory. For every other runtime, a missing executable is a
+configuration error. There is no Bytro credential fallback and no
+Bytro-operated download server — see
+[Provider Configuration](PROVIDERS.md#how-bytro-finds-a-runtime). Provider-owned
 authentication used by a local CLI is outside the Bytro account system.
 Provider-owned configuration is read-only: credential/profile copying requires
 an explicit import, while supported commands, skills, session history, and team
@@ -171,7 +178,7 @@ See the [Worker guide](../services/site-preview-worker/README.md).
 | Failure            | Expected behavior                                                                  |
 | ------------------ | ---------------------------------------------------------------------------------- |
 | Sidecar exits      | Mark affected sessions failed, stop accepting new work, allow an explicit restart  |
-| Local CLI missing  | Show a configuration action without exposing local paths; do not download a binary |
+| Local CLI missing  | Claude/Codex: install the pinned npm package privately. Others: show a configuration action |
 | Credential missing | Keep the session local and request a user profile; do not use an official key      |
 | Provider timeout   | Preserve partial local output, surface a retryable error, support cancellation     |
 | MCP server failure | Isolate the server failure from other configured servers and the core chat         |

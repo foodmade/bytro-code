@@ -1,1 +1,11 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Build or first-run problem
+    url: https://github.com/foodmade/bytro-code/blob/main/docs/TROUBLESHOOTING.md
+    about: Port 1420 in use, missing Tauri prerequisites, Sidecar bundle errors, and how to collect logs.
+  - name: Questions and setup help
+    url: https://github.com/foodmade/bytro-code/discussions
+    about: Ask setup, configuration, and design questions here.
+  - name: Report a security vulnerability
+    url: https://github.com/foodmade/bytro-code/security/advisories/new
+    about: Report privately. Do not open a public issue.

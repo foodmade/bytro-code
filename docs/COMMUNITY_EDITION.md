@@ -25,7 +25,8 @@ Bytro services.
 | Bytro subscription, balance, invite, announcement | Not included      |
 | Cloud AI usage/billing page                       | Not included      |
 | Canvas/OpenPencil                                 | Not included      |
-| Managed Codex/Claude/core runtime downloads       | Not included      |
+| Claude/Codex runtime install from public npm      | Included          |
+| Bytro-hosted runtime downloads or update servers  | Not included      |
 | Managed third-party CLI memory plugins            | Not included      |
 | Bytro hotpatch/native update service              | Not included      |
 | Hosted remote-control tunnels                     | Not included      |

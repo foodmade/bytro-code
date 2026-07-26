@@ -35,6 +35,7 @@ The source checkout is not a credential or application-data store.
 | Git fetch/push/clone             | Configured Git remote      | Repository data and Git credentials handled by Git  |
 | Publish a static preview         | Operator's Worker/R2       | Built static files and site identifier              |
 | Use a network-capable agent tool | Tool-selected endpoint     | Depends on the tool and user approval               |
+| Prepare a Claude/Codex runtime   | Public npm registry        | Package name and pinned version only; no project data |
 
 The bundled catalog clients use `registry.modelcontextprotocol.io` for the MCP
 registry and `skills.sh` for the public skill catalog. Installing a selected
@@ -49,8 +50,13 @@ Community Edition must not send:
 - workspace activity or heatmap telemetry;
 - cloud AI usage/billing records;
 - official credential requests;
-- managed runtime or hotpatch update requests; or
+- requests to any Bytro-operated runtime, hotpatch, or update server; or
 - hosted remote-control registration.
+
+Provider runtime preparation is the one exception to "no runtime downloads",
+and it goes to the **public npm registry only** — never to Bytro
+infrastructure. See
+[Provider Configuration](PROVIDERS.md#how-bytro-finds-a-runtime).
 
 ## Credentials
 
