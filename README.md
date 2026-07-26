@@ -57,7 +57,7 @@ without switching tools.
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 20 or newer
+- [Node.js](https://nodejs.org/) 20.19+ or 22.12+
 - npm 10 or newer
 - Rust stable
 - Git

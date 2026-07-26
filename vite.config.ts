@@ -9,6 +9,21 @@ import crypto from "crypto";
 const host = process.env.TAURI_DEV_HOST;
 
 const fileHashCache = new Map<string, string>();
+const manualChunkGroups = {
+  "vendor-react": ["react", "react-dom"],
+  "vendor-markdown": [
+    "react-markdown",
+    "remark-gfm",
+    "rehype-highlight",
+    "highlight.js",
+  ],
+  "vendor-xterm": [
+    "@xterm/xterm",
+    "@xterm/addon-fit",
+    "@xterm/addon-webgl",
+  ],
+  "vendor-xyflow": ["@xyflow/react"],
+} as const;
 
 function skipUnchangedPlugin() {
   return {
@@ -46,33 +61,31 @@ export default defineConfig(async ({ mode }) => ({
     reportCompressedSize: false,
     // No source maps in production Tauri builds (they're not uploaded anywhere).
     sourcemap: false,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),
       },
       output: {
-        manualChunks: {
-          "vendor-react": ["react", "react-dom"],
-          "vendor-markdown": [
-            "react-markdown",
-            "remark-gfm",
-            "rehype-highlight",
-            "highlight.js",
-          ],
-          "vendor-xterm": [
-            "@xterm/xterm",
-            "@xterm/addon-fit",
-            "@xterm/addon-webgl",
-          ],
-          "vendor-xyflow": ["@xyflow/react"],
+        manualChunks(id) {
+          const normalizedId = id.replaceAll("\\", "/");
+          for (const [chunkName, packageNames] of Object.entries(manualChunkGroups)) {
+            if (
+              packageNames.some((packageName) =>
+                normalizedId.includes(`/node_modules/${packageName}/`),
+              )
+            ) {
+              return chunkName;
+            }
+          }
+        },
+        minify: {
+          compress: {
+            dropConsole: mode === "production",
+            dropDebugger: mode === "production",
+          },
         },
       },
     },
-  },
-
-  // Strip console.* and debugger in production builds. Debug mode keeps them.
-  esbuild: {
-    drop: mode === "production" ? ["console", "debugger"] : [],
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
