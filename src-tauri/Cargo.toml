@@ -45,7 +45,7 @@ tauri-plugin-single-instance = "2"
 urlencoding = "2"
 rand = "0.9"
 url = "2"
-tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.28", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 bytes = "1"
 flate2 = "1"
 libc = "0.2"
