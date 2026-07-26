@@ -8,14 +8,14 @@ use sha2::{Digest, Sha256};
 /// requires verifier length between 43 and 128.
 pub fn generate_verifier() -> String {
     let mut bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut bytes);
+    rand::rng().fill_bytes(&mut bytes);
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
 /// 24 random bytes → base64url (no pad) = 32 ASCII chars. CSRF state token.
 pub fn generate_state() -> String {
     let mut bytes = [0u8; 24];
-    rand::thread_rng().fill_bytes(&mut bytes);
+    rand::rng().fill_bytes(&mut bytes);
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
