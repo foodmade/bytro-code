@@ -22,10 +22,16 @@ npm --prefix sidecar ci
 ```
 
 Do not use a production credential while validating an unfamiliar checkout.
-Claude CLI and Codex CLI are not build inputs and are not bundled, downloaded,
-or updated by this repository. Install either optional runtime yourself and
-review its applicable license and service terms. The upstream Codex CLI source
-is Apache-2.0 licensed; Claude CLI is governed by Anthropic's applicable terms.
+
+Claude and Codex runtimes are **not build inputs** — nothing is downloaded
+during `npm ci` or `cargo build`, and no copy is bundled into the packaged
+application. `src-tauri/build.rs` only reads the pinned version strings out of
+`sidecar/package.json` and embeds them as constants. The runtime itself is
+installed at *runtime*, on the end user's machine, from the public npm
+registry — see
+[Provider Configuration](PROVIDERS.md#how-bytro-finds-a-runtime). The upstream
+Codex CLI source is Apache-2.0 licensed; Claude runtimes are governed by
+Anthropic's applicable terms.
 
 ## Development
 

@@ -114,10 +114,19 @@ npm run tauri dev
 ```
 
 The CLI settings page detects and displays the paths currently visible to the
-application. Community Edition never downloads, updates, or uninstalls Codex,
-Claude, Gemini, Node.js, Git Bash, or another core runtime.
+application.
 
-Resolution must stop with a clear error when no executable is available.
+Setting an explicit path is also how you opt out of the managed install: when
+`CLAUDE_CLI_PATH` or `CODEX_CLI_PATH` points at a working executable, Bytro
+uses it and never installs anything. If no executable is found for Claude or
+Codex, Bytro installs a version-pinned package from the public npm registry
+into `~/.bytro-community/cli/` — see
+[Provider Configuration](PROVIDERS.md#how-bytro-finds-a-runtime).
+
+Bytro never downloads, updates, or uninstalls Gemini, Node.js, or Git Bash;
+for those, resolution stops with a clear error when no executable is
+available. Nothing is ever installed system-wide, and no Bytro-operated
+server is contacted.
 
 ## Secret handling
 

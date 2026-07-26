@@ -29,12 +29,30 @@ without switching tools.
 
 ## Why Bytro?
 
-|                               |                                                                                                                       |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **One workspace**             | Chat, browse files, edit code, inspect diffs, run terminals, manage Git, and preview projects without losing context. |
-| **Your models and endpoints** | Use user-configured Claude, Codex/OpenAI, Gemini, OpenAI-compatible, or local Ollama workflows.                       |
-| **Local-first state**         | Conversations, workspace state, model profiles, MCP configuration, and API settings persist locally across restarts.  |
-| **Built for agentic work**    | Review tool calls, reuse skills, connect MCP servers, and coordinate multiple agents from the same project.           |
+|                               |                                                                                                                                                    |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **One workspace**             | Chat, files, editor, diffs, terminals, Git, and preview all share one project root — an agent's edits, your terminal, and the diff view stay in sync. |
+| **11 providers built in**     | Claude, Codex, Gemini, DeepSeek, Qwen, BigModel, Kimi, MiniMax, MiMO, Ollama, plus any OpenAI-compatible endpoint. Your keys, your endpoints.        |
+| **Local-first state**         | Conversations, workspace state, model profiles, MCP config, and API settings live on your disk and survive restarts.                                 |
+| **You approve every action**  | Tool calls are shown before they run, with approve/deny. Checkpoints let you roll back an agent's file edits.                                        |
+
+### Built-in providers
+
+| Provider     | Vendor    | Default base URL                                    |
+| ------------ | --------- | --------------------------------------------------- |
+| **Claude**   | Anthropic | `https://api.anthropic.com`                         |
+| **Codex**    | OpenAI    | `https://api.openai.com/v1`                         |
+| **Gemini**   | Google    | *(SDK default)*                                     |
+| **DeepSeek** | DeepSeek  | `https://api.deepseek.com`                          |
+| **Qwen**     | Alibaba   | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| **BigModel** | 智谱 Zhipu | `https://open.bigmodel.cn/api/paas/v4`             |
+| **Kimi**     | Moonshot  | `https://api.kimi.com/coding/`                      |
+| **MiniMax**  | MiniMax   | `https://api.minimaxi.com/v1`                       |
+| **MiMO**     | Xiaomi    | `https://api.xiaomimimo.com/v1`                     |
+| **Ollama**   | local     | `http://localhost:11434`                            |
+
+Base URLs are prefilled and overridable. See
+[Provider Configuration](./docs/PROVIDERS.md).
 
 ## Highlights
 
@@ -58,6 +76,7 @@ without switching tools.
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) 20.19+ or 22.12+
+  (**22.12+ required** only if you build or validate the optional preview Worker)
 - npm 10 or newer
 - Rust stable
 - Git
@@ -66,17 +85,19 @@ without switching tools.
 
 ### Run from source
 
-From a checkout of this repository:
-
 ```bash
-cd bytro-community
+git clone https://github.com/foodmade/bytro-code.git
+cd bytro-code
 npm ci
 npm --prefix sidecar ci
 npm run tauri dev
 ```
 
 The Tauri development hook builds the local Sidecar, starts Vite on port
-`1420`, and launches the desktop application.
+`1420`, and launches the desktop application. The first run also compiles the
+Rust host, which takes a few minutes.
+
+Hit a problem? See [Troubleshooting](./docs/TROUBLESHOOTING.md).
 
 > [!NOTE]
 > Bytro Community Edition is currently pre-release. Build it from source and
@@ -130,13 +151,31 @@ flowchart TB
     Host -.-> Preview
 ```
 
-The React frontend owns presentation and interaction. Privileged filesystem,
-Git, PTY, database, and operating-system work passes through the Rust/Tauri
-host. Provider sessions, streaming, tools, MCP, skills, and teams are isolated
-in a restartable local Node.js Sidecar.
+The React frontend renders the UI and never touches the filesystem directly.
+Privileged filesystem, Git, PTY, database, and OS work goes through the
+Rust/Tauri host. Provider sessions, streaming, tools, MCP, skills, and teams
+run in a separate Node.js process, so a crashed model stream can't take down
+the app.
 
 Read [Architecture](./docs/ARCHITECTURE.md) for process boundaries, request
 flow, storage, and failure behavior.
+
+## Concepts
+
+A few terms used throughout this project and its UI:
+
+- **Sidecar** — the Node.js child process that runs all provider sessions.
+  It's restartable and isolated from the desktop shell.
+- **MCP (Model Context Protocol)** — an open standard for exposing external
+  tools to a model. Bytro can connect to any MCP server you configure.
+- **Skill** — a reusable folder of prompts and instructions, discovered per
+  project or per user and invoked as a slash command.
+- **Team** — several agents working the same project, with routed tasks and
+  shared live status.
+- **Checkpoint** — a snapshot of your working tree taken before an agent edits
+  files, so you can roll the edits back.
+- **PTY** — a real pseudo-terminal, so interactive CLI programs behave the
+  same as in your own terminal.
 
 ## Local Data and Privacy
 
@@ -185,25 +224,49 @@ validation, and dependency-review details.
 
 ```text
 .
-├── src/                         # React application
-├── src-tauri/                   # Rust/Tauri desktop host
-├── sidecar/                     # Local Node.js agent runtime
-├── resources/                   # Runtime and build resources
-├── services/
-│   └── site-preview-worker/     # Optional self-hosted preview service
-└── docs/                        # Architecture and operations guides
+├── src/                          # React frontend
+│   ├── main.tsx                  #   Entry point
+│   ├── App.tsx                   #   Root layout and routing
+│   ├── stores/                   #   Zustand state
+│   ├── components/               #   Feature UI (chat, git, terminal, teams, skills…)
+│   └── lib/platform-config.ts    #   Built-in providers and model lists
+├── src-tauri/                    # Rust/Tauri desktop host
+│   ├── lib.rs                    #   Tauri entry and command registration
+│   ├── sidecar/                  #   Sidecar lifecycle and NDJSON bridge
+│   ├── provider_cli.rs           #   Claude/Codex runtime resolution and install
+│   ├── git/  pty.rs  memory/     #   Privileged OS operations
+├── sidecar/src/                  # Provider adapters, MCP, skills, teams
+│   ├── claude-handler.ts         #   Claude Agent SDK
+│   ├── openai-handler.ts         #   Codex App Server
+│   └── chatcmpl-handler.ts       #   OpenAI-compatible endpoints (DeepSeek/Qwen/Ollama…)
+├── services/site-preview-worker/ # Optional self-hosted preview service
+└── docs/                         # Architecture and operations guides
 ```
+
+**Where to start reading**: to follow a message from Enter key to model, read
+`src/components/chat/chat-panel.tsx` → `src-tauri/src/sidecar/mod.rs` →
+`sidecar/src/index.ts` in that order.
 
 ## Documentation
 
-- [Architecture](./docs/ARCHITECTURE.md)
-- [Building from Source](./docs/BUILDING.md)
-- [Provider Configuration](./docs/PROVIDERS.md)
-- [Runtime Configuration](./docs/CONFIGURATION.md)
-- [Network and Data](./docs/NETWORK_AND_DATA.md)
-- [Privacy](./PRIVACY.md)
-- [Security](./SECURITY.md)
-- [Support](./SUPPORT.md)
+**Getting started**
+
+- [Troubleshooting](./docs/TROUBLESHOOTING.md) — first-run problems and how to collect logs
+- [Provider Configuration](./docs/PROVIDERS.md) — connect a model, base URLs, runtime resolution
+- [Building from Source](./docs/BUILDING.md) — packaging and validation
+- [Runtime Configuration](./docs/CONFIGURATION.md) — environment variables and paths
+
+**Understanding the project**
+
+- [Architecture](./docs/ARCHITECTURE.md) — process boundaries and request flow
+- [What's in Community Edition](./docs/COMMUNITY_EDITION.md) — capability matrix
+- [Network and Data](./docs/NETWORK_AND_DATA.md) — every outbound destination
+- [Changelog](./CHANGELOG.md)
+
+**Policies**
+
+- [Privacy](./PRIVACY.md) · [Security](./SECURITY.md) · [Support](./SUPPORT.md) · [Trademarks](./TRADEMARKS.md)
+- [Preview Worker guide](./services/site-preview-worker/README.md) — optional self-hosted publishing
 
 ## Contributing
 

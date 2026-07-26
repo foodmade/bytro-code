@@ -28,12 +28,29 @@ Git 审查和项目预览。
 
 ## 为什么选择 Bytro？
 
-|                          |                                                                                              |
-| ------------------------ | -------------------------------------------------------------------------------------------- |
-| **统一的工作空间**       | 在不丢失上下文的情况下完成对话、文件浏览、代码编辑、差异检查、终端操作、Git 管理和项目预览。 |
-| **使用自己的模型和端点** | 使用用户配置的 Claude、Codex/OpenAI、Gemini、OpenAI 兼容服务或本地 Ollama 工作流。           |
-| **本地优先的状态管理**   | 对话、工作区状态、模型配置、MCP 配置和 API 设置会在本地持久化，重启后仍可使用。              |
-| **为智能体工作流而设计** | 在同一个项目中审查工具调用、复用 Skills、连接 MCP 服务并协调多个智能体。                     |
+|                          |                                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| **统一的工作空间**       | 对话、文件、编辑器、差异、终端、Git、预览共享同一个项目根目录——智能体的改动、你的终端和 diff 视图始终一致。 |
+| **内置 11 家模型服务**   | Claude、Codex、Gemini、DeepSeek、通义千问、智谱、Kimi、MiniMax、小米 MiMO、Ollama，以及任意 OpenAI 兼容端点。 |
+| **本地优先的状态管理**   | 对话、工作区状态、模型配置、MCP 配置和 API 设置都存在你自己的磁盘上，重启后仍在。                             |
+| **每一步操作你说了算**   | 工具调用在执行前展示并由你批准/拒绝；检查点可回滚智能体对文件的修改。                                         |
+
+### 内置模型服务
+
+| 服务商       | 厂商      | 默认 Base URL                                       |
+| ------------ | --------- | --------------------------------------------------- |
+| **Claude**   | Anthropic | `https://api.anthropic.com`                         |
+| **Codex**    | OpenAI    | `https://api.openai.com/v1`                         |
+| **Gemini**   | Google    | *(SDK 默认)*                                        |
+| **DeepSeek** | 深度求索  | `https://api.deepseek.com`                          |
+| **Qwen**     | 阿里云    | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| **BigModel** | 智谱      | `https://open.bigmodel.cn/api/paas/v4`              |
+| **Kimi**     | 月之暗面  | `https://api.kimi.com/coding/`                      |
+| **MiniMax**  | MiniMax   | `https://api.minimaxi.com/v1`                       |
+| **MiMO**     | 小米      | `https://api.xiaomimimo.com/v1`                     |
+| **Ollama**   | 本地      | `http://localhost:11434`                            |
+
+Base URL 已预填，可自行覆盖。详见[模型服务配置](./docs/PROVIDERS.md)。
 
 ## 核心功能
 
@@ -54,6 +71,7 @@ Git 审查和项目预览。
 ### 前置要求
 
 - [Node.js](https://nodejs.org/) 20.19+ 或 22.12+
+  （仅当你要构建或校验可选的预览 Worker 时**必须 22.12+**）
 - npm 10 或更高版本
 - Rust stable
 - Git
@@ -61,16 +79,18 @@ Git 审查和项目预览。
 
 ### 从源码运行
 
-在本仓库的代码目录中执行：
-
 ```bash
-cd bytro-community
+git clone https://github.com/foodmade/bytro-code.git
+cd bytro-code
 npm ci
 npm --prefix sidecar ci
 npm run tauri dev
 ```
 
 Tauri 的开发钩子会构建本地 Sidecar，在 `1420` 端口启动 Vite，并拉起桌面应用。
+首次运行还需要编译 Rust 宿主，会花上几分钟。
+
+遇到问题？见[故障排查](./docs/TROUBLESHOOTING.md)。
 
 > [!NOTE]
 > Bytro Community Edition 目前处于预发布阶段。请从源码构建，并在用于敏感仓库或
@@ -122,12 +142,24 @@ flowchart TB
     Host -.-> Preview
 ```
 
-React 前端负责界面展示和用户交互。文件系统、Git、PTY、数据库和操作系统相关的
-高权限操作由 Rust/Tauri 宿主处理。Provider 会话、流式响应、工具、MCP、Skills
-和团队功能被隔离在可重启的本地 Node.js Sidecar 中。
+React 前端只负责渲染界面，不直接接触文件系统。文件系统、Git、PTY、数据库和
+操作系统相关的高权限操作都经由 Rust/Tauri 宿主。Provider 会话、流式响应、工具、
+MCP、Skills 和团队功能运行在独立的 Node.js 进程中——模型流崩溃不会拖垮整个应用。
 
 有关进程边界、请求流程、存储和失败处理的详细说明，请参阅
 [架构文档](./docs/ARCHITECTURE.md)。
+
+## 概念说明
+
+本项目和界面中会反复出现的几个术语：
+
+- **Sidecar**——运行所有 Provider 会话的 Node.js 子进程，可重启，与桌面外壳隔离。
+- **MCP（Model Context Protocol）**——把外部工具暴露给模型的开放标准。Bytro
+  可连接任何你配置的 MCP 服务。
+- **Skill**——一个可复用的提示词与说明文件夹，按项目或用户发现，通过斜杠命令调用。
+- **Team（团队）**——多个智能体协作同一个项目，任务自动路由并共享实时状态。
+- **Checkpoint（检查点）**——智能体修改文件前对工作区拍下的快照，可随时回滚。
+- **PTY**——真正的伪终端，交互式命令行程序的行为与你自己的终端完全一致。
 
 ## 本地数据与隐私
 
@@ -172,25 +204,49 @@ npm run ci:gate
 
 ```text
 .
-├── src/                         # React 应用
-├── src-tauri/                   # Rust/Tauri 桌面宿主
-├── sidecar/                     # 本地 Node.js 智能体运行层
-├── resources/                   # 运行时与构建资源
-├── services/
-│   └── site-preview-worker/     # 可选的自托管预览服务
-└── docs/                        # 架构与运维文档
+├── src/                          # React 前端
+│   ├── main.tsx                  #   入口
+│   ├── App.tsx                   #   根布局与路由
+│   ├── stores/                   #   Zustand 状态
+│   ├── components/               #   功能界面（chat、git、terminal、teams、skills…）
+│   └── lib/platform-config.ts    #   内置模型服务与型号清单
+├── src-tauri/                    # Rust/Tauri 桌面宿主
+│   ├── lib.rs                    #   Tauri 入口与命令注册
+│   ├── sidecar/                  #   Sidecar 生命周期与 NDJSON 桥接
+│   ├── provider_cli.rs           #   Claude/Codex 运行时解析与安装
+│   ├── git/  pty.rs  memory/     #   高权限系统操作
+├── sidecar/src/                  # Provider 适配器、MCP、Skills、团队
+│   ├── claude-handler.ts         #   Claude Agent SDK
+│   ├── openai-handler.ts         #   Codex App Server
+│   └── chatcmpl-handler.ts       #   OpenAI 兼容端点（DeepSeek/Qwen/Ollama…）
+├── services/site-preview-worker/ # 可选的自托管预览服务
+└── docs/                         # 架构与运维文档
 ```
+
+**从哪里开始读**：想理解一条消息从回车到模型的完整路径，依次看
+`src/components/chat/chat-panel.tsx` →
+`src-tauri/src/sidecar/mod.rs` → `sidecar/src/index.ts`。
 
 ## 文档
 
-- [架构](./docs/ARCHITECTURE.md)
-- [从源码构建](./docs/BUILDING.md)
-- [Provider 配置](./docs/PROVIDERS.md)
-- [运行配置](./docs/CONFIGURATION.md)
-- [网络与数据](./docs/NETWORK_AND_DATA.md)
-- [隐私](./PRIVACY.md)
-- [安全](./SECURITY.md)
-- [支持](./SUPPORT.md)
+**上手**
+
+- [故障排查](./docs/TROUBLESHOOTING.md)——首次运行常见问题与日志收集
+- [模型服务配置](./docs/PROVIDERS.md)——接入模型、Base URL、运行时解析
+- [从源码构建](./docs/BUILDING.md)——打包与验证
+- [运行配置](./docs/CONFIGURATION.md)——环境变量与路径
+
+**深入了解**
+
+- [架构](./docs/ARCHITECTURE.md)——进程边界与请求流程
+- [社区版包含什么](./docs/COMMUNITY_EDITION.md)——能力对照表
+- [网络与数据](./docs/NETWORK_AND_DATA.md)——全部对外访问目标
+- [更新日志](./CHANGELOG.md)
+
+**政策**
+
+- [隐私](./PRIVACY.md) · [安全](./SECURITY.md) · [支持](./SUPPORT.md) · [商标](./TRADEMARKS.md)
+- [预览 Worker 指南](./services/site-preview-worker/README.md)——可选的自托管发布
 
 ## 参与贡献
 

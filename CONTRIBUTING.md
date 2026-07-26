@@ -39,14 +39,24 @@ npm --prefix sidecar ci
 Run the checks relevant to your change:
 
 ```bash
+npm run lint          # CI runs this — do not skip it
+npm run format        # Prettier, covers src/**/*.{ts,tsx,css}
 npm run check:community
 npm test
 npm run test:sidecar
 npm run build
 npm run typecheck:sidecar
+cargo fmt --manifest-path src-tauri/Cargo.toml --all
 cargo check --manifest-path src-tauri/Cargo.toml --locked
 cargo test --manifest-path src-tauri/Cargo.toml --locked \
   --all-targets --all-features
+```
+
+Before committing, you can scan staged changes for accidentally included
+secrets:
+
+```bash
+npm run check:secrets
 ```
 
 After installing the optional Worker dependencies, `npm run ci:gate` runs the
@@ -60,6 +70,24 @@ npm --prefix services/site-preview-worker test
 npm --prefix services/site-preview-worker run typecheck
 npm --prefix services/site-preview-worker run build:check
 ```
+
+## Translations
+
+The UI is translated through `src/i18n/locales/`, currently `en.json` and
+`zh.json`. English is the source of truth.
+
+To add or update a translation:
+
+1. Keep the key set identical to `en.json` — a missing key falls back to
+   English at runtime rather than failing the build, so mismatches are easy to
+   miss.
+2. Add a new locale as `src/i18n/locales/<lang>.json` and register it in
+   `src/i18n/config.ts`.
+3. Translate user-visible strings only. Prompts sent to models and log
+   messages stay in English.
+
+`README.md` and `README.zh-CN.md` are mirrors. **If you change one, change the
+other in the same pull request** — nothing enforces this automatically.
 
 ## Pull requests
 

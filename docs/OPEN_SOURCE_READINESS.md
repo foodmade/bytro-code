@@ -21,8 +21,10 @@ requirement, not a promise about third-party services or unofficial binaries.
 - [x] Bytro account, subscription, balance, invitation, announcement,
       official-model, shared-key, and cloud-usage features are excluded.
 - [x] Canvas/OpenPencil and `claude-mem` integration are excluded.
-- [x] Managed runtime downloads, hotpatches, official updaters, hosted tunnels,
-      and private publication scripts are excluded.
+- [x] Bytro-hosted runtime downloads, hotpatches, official updaters, hosted
+      tunnels, and private publication scripts are excluded. (Claude/Codex
+      runtimes are installed from the public npm registry into a private
+      per-user directory; no Bytro-operated server is involved.)
 - [x] `codexUiDebug` and its dedicated protocol/event plumbing are excluded.
 - [x] Local files, Git, terminal, preview, MCP, skills, conversations, and
       supported provider workflows remain available.
@@ -54,7 +56,10 @@ requirement, not a promise about third-party services or unofficial binaries.
 - [x] Provider/RPC failures cross process boundaries only as fixed public error
       categories; raw details remain local as bounded hash metadata.
 - [x] Executable resolution does not guess untrusted provider or package-manager
-      paths and never downloads a missing runtime.
+      paths. A missing Claude/Codex runtime is installed from the public npm
+      registry at a build-time-pinned version, with `--ignore-scripts`, into a
+      private per-user directory only; every other runtime fails with a
+      configuration error instead.
 - [x] Child-process termination is scoped to the processes created for the
       relevant session on macOS, Linux, and Windows.
 - [x] Dependency audits report no unresolved high-severity vulnerabilities.

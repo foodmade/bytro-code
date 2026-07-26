@@ -90,12 +90,34 @@ package names, version, and declared license pointers are pinned in
 `scripts/third-party-license-policy.json`; changing any of them requires a new
 review.
 
-Claude CLI and Codex CLI are optional, user-installed third-party programs.
-They are not bundled, downloaded, updated, or sublicensed by this repository.
-Users are responsible for obtaining them from provider-authorized sources and
-accepting the applicable provider terms. The upstream OpenAI Codex CLI source
-at <https://github.com/openai/codex> is Apache-2.0 licensed. Claude CLI remains
-subject to Anthropic's applicable terms.
+Claude and Codex provider runtimes are third-party programs. They are **not
+bundled with, redistributed by, or sublicensed by this repository**, and no
+copy of them exists in this source tree or in any package it builds.
+
+When a session needs one of these runtimes and no user-configured executable
+is found, the application installs a version-pinned package from the **public
+npm registry** into a private per-user directory
+(`~/.bytro-community/cli/<provider>/<version>/`):
+
+| Provider | Package installed                           |
+| -------- | ------------------------------------------- |
+| Claude   | `@anthropic-ai/claude-agent-sdk-<platform>` |
+| Codex    | `@openai/codex@<version>-<platform>`        |
+
+Versions are pinned at build time from [`sidecar/package.json`](./sidecar/package.json)
+via `src-tauri/build.rs`. The install runs with `--ignore-scripts`, writes only
+inside that private directory, and never touches a system-wide installation.
+No Bytro-operated server is contacted at any point.
+
+This is an installation performed on the user's own machine, at the user's
+direction, from the provider's own publicly published packages — equivalent to
+the user running `npm install` themselves. It is not redistribution. Users
+remain responsible for accepting the applicable provider terms. The upstream
+OpenAI Codex CLI source at <https://github.com/openai/codex> is Apache-2.0
+licensed. Claude runtimes remain subject to Anthropic's applicable terms.
+
+To skip this step, point `CLAUDE_CLI_PATH` / `CODEX_CLI_PATH` at your own
+installation, or do not use the Claude and Codex adapters.
 
 ## Service and provider marks
 

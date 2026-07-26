@@ -5,9 +5,10 @@ warranty under the Apache License, Version 2.0.
 
 ## Before requesting help
 
-1. Read [README.md](README.md), [Building](docs/BUILDING.md),
-   [Configuration](docs/CONFIGURATION.md), and
-   [Providers](docs/PROVIDERS.md).
+1. Check [Troubleshooting](docs/TROUBLESHOOTING.md) — it covers the common
+   first-run build and provider failures. Then
+   [Providers](docs/PROVIDERS.md), [Building](docs/BUILDING.md), and
+   [Configuration](docs/CONFIGURATION.md).
 2. Reproduce the problem on the latest default branch when practical.
 3. Confirm whether it is a Bytro issue or a provider, CLI, MCP server,
    skill, Git, Cloudflare, or operating-system issue.
@@ -30,9 +31,12 @@ user paths.
 
 ## Where to ask
 
-- Use a normal repository issue for a reproducible bug.
-- Use a discussion channel, when available, for setup and design questions.
-- Use the private process in [SECURITY.md](SECURITY.md) for vulnerabilities.
+- **Reproducible bug** —
+  [open an issue](https://github.com/foodmade/bytro-code/issues/new/choose).
+- **Setup or design question** —
+  [start a discussion](https://github.com/foodmade/bytro-code/discussions).
+- **Security vulnerability** — do not open a public issue; follow
+  [SECURITY.md](SECURITY.md).
 
 ## Support boundaries
 
