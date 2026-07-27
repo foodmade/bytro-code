@@ -1595,6 +1595,54 @@ pub async fn generate_commit_message(
     .await
 }
 
+// Keep in sync with PR_SYSTEM_PROMPT_TEMPLATE in src/lib/ai-one-shot.ts
+// (the sidecar/OAuth path uses the frontend copy).
+const PR_SYSTEM_PROMPT_TEMPLATE: &str = r#"You are a pull request description generator. Based on the branch commits and code changes provided, write a pull request title and description.
+
+Rules:
+- First line: the PR title — concise, under 80 characters, may use a conventional-commit prefix (feat/fix/refactor/...)
+- Then one blank line, then the description body in Markdown
+- The body: a short summary paragraph, then a bullet list of the key changes
+- Write the title and body in {language}
+- Reply with ONLY the title and description, no extra commentary, no markdown fences"#;
+
+fn pr_prompt_language(language: Option<&str>) -> &'static str {
+    match language {
+        Some("en") => "English",
+        _ => "Simplified Chinese (简体中文)",
+    }
+}
+
+#[tauri::command]
+pub async fn generate_pr_description(
+    sdk: Option<String>,
+    base_url: Option<String>,
+    api_key: Option<String>,
+    model: Option<String>,
+    proxy_url: Option<String>,
+    language: Option<String>,
+    branch_summary: String,
+) -> Result<String, String> {
+    let resolved_sdk = sdk.unwrap_or_else(|| "claude".to_string());
+    let resolved_api_key = api_key
+        .filter(|key| !key.trim().is_empty())
+        .ok_or_else(|| "API key required".to_string())?;
+    let system_prompt =
+        PR_SYSTEM_PROMPT_TEMPLATE.replace("{language}", pr_prompt_language(language.as_deref()));
+
+    call_ai_simple(
+        &resolved_sdk,
+        model,
+        base_url,
+        &resolved_api_key,
+        &system_prompt,
+        &branch_summary,
+        1000,
+        proxy_url.as_deref(),
+    )
+    .await
+}
+
 // ---------------------------------------------------------------------------
 // Fetch remote model list (e.g. from Zenmux /models endpoint)
 // ---------------------------------------------------------------------------

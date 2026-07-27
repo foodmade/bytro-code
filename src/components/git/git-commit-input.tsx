@@ -1,26 +1,15 @@
 import { useState, useCallback, useRef, useEffect, memo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronDown, Sparkles, Loader2, X } from "lucide-react";
 import {
   useChatStore,
-  useSettingsStore,
   useGitStore,
   useWorkspaceStore,
   useToastStore,
-  useConversationStore,
 } from "@/stores";
-import {
-  buildActiveProfileProxyUrl,
-  resolveActiveCredentials,
-  getEffectiveSdk,
-  type SdkType,
-} from "@/lib/platform-config";
-import { resolvePaneModel } from "@/lib/pane-model";
 import { formatError } from "@/lib/format-error";
-import { buildStreamInvokePayload } from "@/lib/chat-stream-send";
-import type { CompletePayload, ErrorPayload } from "@/lib/stream-handlers/types";
+import { resolveOneShotAiTarget, generateOneShotViaSidecar } from "@/lib/ai-one-shot";
 
 // ---------------------------------------------------------------------------
 // OAuth subscription path — generate via the sidecar chat pipeline
@@ -39,83 +28,6 @@ Rules:
 - If the changes are complex, add a blank line followed by a brief body (2-3 bullet points max)
 - Use the same language as the conversation context
 - Reply with ONLY the commit message, no additional text, no quotes, no markdown fences`;
-
-const COMMIT_SIDECAR_TIMEOUT_MS = 90_000;
-
-interface SidecarCommitParams {
-  readonly sdk: SdkType;
-  /** Platform id ("claude" / "codex") — REQUIRED for the sidecar's
-   *  credential strategy to recognize OAuth tokens (sk-ant-oat* is only
-   *  routed to CLAUDE_CODE_OAUTH_TOKEN when platform === "claude"). */
-  readonly platform: string;
-  readonly model: string | null;
-  readonly apiKey: string | null;
-  readonly baseUrl: string | null;
-  readonly authMode: "apiKey" | "oauth";
-  readonly profileId: string | undefined;
-  readonly oauthProvider: string | undefined;
-  readonly proxyUrl: string | undefined;
-  readonly userContent: string;
-}
-
-/** One-shot text generation through the sidecar (same pattern as
- *  use-health-check): isolated requestId, disableTools so the handler runs a
- *  single tool-less turn, result read from the chat-complete event. */
-async function generateCommitViaSidecar(params: SidecarCommitParams): Promise<string> {
-  const requestId = crypto.randomUUID();
-  let resolveResult!: (value: string) => void;
-  let rejectResult!: (error: Error) => void;
-  const result = new Promise<string>((resolve, reject) => {
-    resolveResult = resolve;
-    rejectResult = reject;
-  });
-
-  // Register listeners BEFORE invoking so the completion event can't be missed.
-  const unlistens = await Promise.all([
-    listen<CompletePayload>("chat-complete", (e) => {
-      if (e.payload.request_id !== requestId) return;
-      const text = e.payload.full_text.trim();
-      if (text) resolveResult(text);
-      else rejectResult(new Error("Empty response"));
-    }),
-    listen<ErrorPayload>("chat-error", (e) => {
-      if (e.payload.request_id !== requestId) return;
-      rejectResult(new Error(e.payload.error));
-    }),
-  ]);
-
-  let timer: number | undefined;
-  try {
-    const payload = buildStreamInvokePayload({
-      requestId,
-      agentType: params.sdk,
-      messages: [{ role: "user", content: params.userContent }],
-      model: params.model || "",
-      baseUrl: params.baseUrl || "",
-      apiKey: params.apiKey || "",
-      authMode: params.authMode,
-      profileId: params.profileId,
-      oauthProvider: params.oauthProvider,
-      systemPrompt: COMMIT_SYSTEM_PROMPT,
-      permissionMode: "default",
-      sessionId: null,
-      proxyUrl: params.proxyUrl,
-      platform: params.platform,
-      disableTools: true,
-    });
-    await invoke("stream_chat", payload);
-    const timeout = new Promise<never>((_, reject) => {
-      timer = window.setTimeout(() => {
-        invoke("abort_chat", { requestId }).catch(() => {});
-        reject(new Error("Commit message generation timed out"));
-      }, COMMIT_SIDECAR_TIMEOUT_MS);
-    });
-    return await Promise.race([result, timeout]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-    unlistens.forEach((fn) => fn());
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -360,56 +272,17 @@ export const GitCommitInput = memo(function GitCommitInput({
   const handleGenerateMessage = useCallback(async () => {
     if (aiPhase === "loading" || isLoading) return;
 
-    const settings = useSettingsStore.getState();
-    const activeConversationId = useConversationStore.getState().activeConversationId;
-    const modelSelection = resolvePaneModel({ conversationId: activeConversationId });
-    if (modelSelection.requiresLocalSelection || !modelSelection.platformId) {
+    const resolved = resolveOneShotAiTarget();
+    if (!resolved.ok) {
       useToastStore.getState().addToast(
         "warning",
-        "Select a local model profile before generating a commit message.",
+        resolved.reason === "no-model"
+          ? "Select a local model profile before generating a commit message."
+          : t("git.apiKeyRequired"),
       );
       return;
     }
-    const resolvedPlatformId = modelSelection.platformId;
-    const platformConfig = settings.platforms[resolvedPlatformId];
-
-    let sdk: SdkType;
-    let baseUrl: string | null = null;
-    let apiKey: string | null = null;
-    let model = modelSelection.modelId || platformConfig.activeModelId;
-    let authMode: "apiKey" | "oauth" = "apiKey";
-    let authProfileId: string | undefined;
-
-    const activeProfile = platformConfig?.profiles.find(
-      (p) => p.id === platformConfig.activeProfileId,
-    );
-    const isOAuthSubscription =
-      activeProfile?.authMode === "oauth" &&
-      (resolvedPlatformId === "claude" || resolvedPlatformId === "codex");
-
-    if (isOAuthSubscription && activeProfile) {
-      // Subscription (OAuth) login has no API key — route through the sidecar
-      // chat pipeline, which already handles OAuth credentials for both SDKs.
-      sdk = getEffectiveSdk(platformConfig);
-      authMode = "oauth";
-      authProfileId = activeProfile.id;
-      model =
-        (modelSelection.platformId ? modelSelection.modelId : platformConfig.activeModelId) ||
-        model;
-    } else {
-      const creds = resolveActiveCredentials(platformConfig);
-      sdk = getEffectiveSdk(platformConfig);
-      baseUrl = creds?.baseUrl || null;
-      apiKey = creds?.apiKey || null;
-      model = modelSelection.platformId
-        ? modelSelection.modelId
-        : (creds?.model ?? platformConfig.activeModelId) || model;
-    }
-
-    if (authMode !== "oauth" && !apiKey?.trim()) {
-      useToastStore.getState().addToast("warning", t("git.apiKeyRequired"));
-      return;
-    }
+    const target = resolved.target;
 
     setHasError(false);
     setAiPhase("loading");
@@ -458,34 +331,21 @@ export const GitCommitInput = memo(function GitCommitInput({
       }
       diffSummary = diffSummary.slice(0, 4000);
 
-      const proxyUrl =
-        sdk === "claude"
-          ? buildActiveProfileProxyUrl(platformConfig)
-          : settings.proxyEnabled && settings.proxyUrl
-            ? settings.proxyUrl
-            : undefined;
-
       let result: string;
-      if (authMode === "oauth") {
-        result = await generateCommitViaSidecar({
-          sdk,
-          platform: resolvedPlatformId,
-          model: model || null,
-          apiKey: null,
-          baseUrl,
-          authMode,
-          profileId: authProfileId,
-          oauthProvider: resolvedPlatformId,
-          proxyUrl,
+      if (target.authMode === "oauth") {
+        result = await generateOneShotViaSidecar({
+          target,
+          systemPrompt: COMMIT_SYSTEM_PROMPT,
           userContent: `Conversation context:\n${chatContext}\n\nChanged files:\n${diffSummary}`,
+          timeoutMessage: "Commit message generation timed out",
         });
       } else {
         result = await invoke<string>("generate_commit_message", {
-          sdk,
-          baseUrl,
-          apiKey,
-          model: model || null,
-          proxyUrl: proxyUrl ?? null,
+          sdk: target.sdk,
+          baseUrl: target.baseUrl,
+          apiKey: target.apiKey,
+          model: target.model,
+          proxyUrl: target.proxyUrl ?? null,
           chatContext,
           diffSummary,
         });

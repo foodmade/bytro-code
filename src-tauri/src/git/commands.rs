@@ -226,6 +226,12 @@ pub async fn git_checkpoint_cleanup(
     blocking!(operations::checkpoint_cleanup(&path, max_age_secs))
 }
 
+/// Summarize commits + diff of HEAD vs a base branch (for AI PR descriptions).
+#[tauri::command]
+pub async fn git_branch_summary(path: String, base: String) -> Result<GitBranchSummary, String> {
+    blocking!(operations::branch_summary(&path, &base))
+}
+
 // ── Token Test Commands ─────────────────────────────────────────────
 
 #[tauri::command]
