@@ -20,6 +20,7 @@ mod oauth;
 mod ollama;
 mod outputs;
 mod port_monitor;
+mod pr;
 mod preview;
 mod project_scripts;
 mod provider_cli;
@@ -619,6 +620,7 @@ pub fn run() {
             anthropic::generate_conversation_summary,
             anthropic::generate_idea_summary,
             anthropic::generate_commit_message,
+            anthropic::generate_pr_description,
             anthropic::ai_code_review,
             anthropic::ai_code_review_stream,
             memory::commands::create_conversation,
@@ -736,7 +738,14 @@ pub fn run() {
             git::commands::git_check_repo_access,
             git::commands::git_check_repo_access_details,
             git::commands::git_test_token,
+            git::commands::git_branch_summary,
             git::commands::revert_file_from_diff,
+            pr::commands::pr_detect_repo,
+            pr::commands::pr_list,
+            pr::commands::pr_get_detail,
+            pr::commands::pr_get_checks,
+            pr::commands::pr_create,
+            pr::commands::pr_merge,
             teams::list_teams,
             teams::load_team_messages,
             teams::load_team_tasks,
