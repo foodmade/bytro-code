@@ -172,6 +172,38 @@ pub struct GitRepoAccessResult {
     pub message: Option<String>,
 }
 
+/// Per-file stats in a branch-vs-base comparison.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BranchDiffFile {
+    pub path: String,
+    pub additions: u32,
+    pub deletions: u32,
+}
+
+/// Summary of what a branch adds on top of its merge base with another
+/// branch — the raw material for AI-generated PR descriptions. Committed
+/// and uncommitted work are reported separately so callers can describe
+/// what will actually end up in the PR (uncommitted changes usually being
+/// the user's intended content before they branch/commit/push).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitBranchSummary {
+    pub head_branch: String,
+    pub base_branch: String,
+    /// Commit subjects in base..HEAD.
+    pub commits: Vec<String>,
+    /// Committed changes: base → HEAD.
+    pub files: Vec<BranchDiffFile>,
+    pub total_additions: u32,
+    pub total_deletions: u32,
+    /// Unified diff truncated to a size safe to embed in a prompt.
+    pub patch_excerpt: String,
+    /// Uncommitted changes: HEAD → working tree + index (untracked included).
+    pub uncommitted_files: Vec<BranchDiffFile>,
+    pub uncommitted_additions: u32,
+    pub uncommitted_deletions: u32,
+    pub uncommitted_patch_excerpt: String,
+}
+
 /// Workspace-level statistics derived from the Git repository.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceStats {

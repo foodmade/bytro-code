@@ -517,6 +517,138 @@ pub fn get_commit_detail(path: &str, commit_id: &str) -> Result<CommitDetail, St
     })
 }
 
+/// Maximum characters of unified diff embedded in an AI prompt.
+const BRANCH_PATCH_EXCERPT_LIMIT: usize = 6000;
+/// Maximum commit subjects included in a branch summary.
+const BRANCH_SUMMARY_COMMIT_LIMIT: usize = 50;
+
+/// Per-file stats, totals, and a size-capped patch excerpt for one diff.
+fn summarize_diff(diff: &Diff) -> (Vec<BranchDiffFile>, u32, u32, String) {
+    let (mut total_additions, mut total_deletions) = (0u32, 0u32);
+    if let Ok(stats) = diff.stats() {
+        total_additions = stats.insertions() as u32;
+        total_deletions = stats.deletions() as u32;
+    }
+
+    let mut files = Vec::new();
+    for delta_idx in 0..diff.deltas().len() {
+        let delta = diff.get_delta(delta_idx).unwrap();
+        let path = delta
+            .new_file()
+            .path()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let mut additions: u32 = 0;
+        let mut deletions: u32 = 0;
+        if let Ok(Some(patch)) = git2::Patch::from_diff(diff, delta_idx) {
+            let (_, adds, dels) = patch.line_stats().unwrap_or((0, 0, 0));
+            additions = adds as u32;
+            deletions = dels as u32;
+        }
+        files.push(BranchDiffFile {
+            path,
+            additions,
+            deletions,
+        });
+    }
+
+    let mut patch_excerpt = String::new();
+    let mut truncated = false;
+    let _ = diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
+        if patch_excerpt.len() >= BRANCH_PATCH_EXCERPT_LIMIT {
+            truncated = true;
+            return false; // stop printing once the budget is spent
+        }
+        match line.origin() {
+            '+' | '-' | ' ' => patch_excerpt.push(line.origin()),
+            _ => {}
+        }
+        patch_excerpt.push_str(&String::from_utf8_lossy(line.content()));
+        true
+    });
+    if truncated {
+        patch_excerpt.push_str("\n... (diff truncated)\n");
+    }
+
+    (files, total_additions, total_deletions, patch_excerpt)
+}
+
+/// Summarize what HEAD adds on top of its merge base with `base` (a local
+/// branch name, falling back to `origin/<base>`), reporting committed work
+/// (base..HEAD) and uncommitted work (HEAD → working tree + index,
+/// untracked included) separately.
+pub fn branch_summary(path: &str, base: &str) -> Result<GitBranchSummary, String> {
+    let repo = open_repo(path)?;
+
+    let head = repo.head().map_err(|e| e.to_string())?;
+    let head_branch = head.shorthand().unwrap_or("HEAD").to_string();
+    let head_commit = head.peel_to_commit().map_err(|e| e.to_string())?;
+
+    let base_commit = repo
+        .revparse_single(&format!("refs/heads/{base}"))
+        .or_else(|_| repo.revparse_single(&format!("refs/remotes/origin/{base}")))
+        .map_err(|_| format!("base branch not found: {base}"))?
+        .peel_to_commit()
+        .map_err(|e| e.to_string())?;
+
+    let merge_base = repo
+        .merge_base(head_commit.id(), base_commit.id())
+        .map_err(|e| format!("no common history with '{base}': {e}"))?;
+
+    let mut revwalk = repo.revwalk().map_err(|e| e.to_string())?;
+    revwalk.push(head_commit.id()).map_err(|e| e.to_string())?;
+    revwalk.hide(merge_base).map_err(|e| e.to_string())?;
+    let commits: Vec<String> = revwalk
+        .filter_map(|oid| oid.ok())
+        .filter_map(|oid| repo.find_commit(oid).ok())
+        .map(|c| c.summary().unwrap_or("").to_string())
+        .take(BRANCH_SUMMARY_COMMIT_LIMIT)
+        .collect();
+
+    let base_tree = repo
+        .find_commit(merge_base)
+        .and_then(|c| c.tree())
+        .map_err(|e| e.to_string())?;
+    let head_tree = head_commit.tree().map_err(|e| e.to_string())?;
+
+    let committed_diff = repo
+        .diff_tree_to_tree(Some(&base_tree), Some(&head_tree), None)
+        .map_err(|e| e.to_string())?;
+    let (files, total_additions, total_deletions, patch_excerpt) =
+        summarize_diff(&committed_diff);
+
+    // Untracked content included so brand-new files (the typical shape of
+    // "my feature isn't committed yet") reach the AI prompt.
+    let mut workdir_opts = DiffOptions::new();
+    workdir_opts
+        .include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .show_untracked_content(true);
+    let uncommitted_diff = repo
+        .diff_tree_to_workdir_with_index(Some(&head_tree), Some(&mut workdir_opts))
+        .map_err(|e| e.to_string())?;
+    let (
+        uncommitted_files,
+        uncommitted_additions,
+        uncommitted_deletions,
+        uncommitted_patch_excerpt,
+    ) = summarize_diff(&uncommitted_diff);
+
+    Ok(GitBranchSummary {
+        head_branch,
+        base_branch: base.to_string(),
+        commits,
+        files,
+        total_additions,
+        total_deletions,
+        patch_excerpt,
+        uncommitted_files,
+        uncommitted_additions,
+        uncommitted_deletions,
+        uncommitted_patch_excerpt,
+    })
+}
+
 // ── Write Operations ─────────────────────────────────────────────────
 
 /// Stage specified files (add to index).
@@ -704,7 +836,9 @@ pub fn switch_branch(path: &str, name: &str) -> Result<(), String> {
         .map_err(|e| format!("branch '{name}' not found: {e}"))?;
 
     let mut checkout_opts = CheckoutBuilder::new();
-    checkout_opts.force().remove_untracked(true);
+    // Preserve working-tree changes when moving newly generated PR work onto
+    // its branch. Conflicting branch switches fail instead of deleting files.
+    checkout_opts.safe();
 
     repo.checkout_tree(&obj, Some(&mut checkout_opts))
         .map_err(|e| format!("failed to checkout branch '{name}': {e}"))?;
@@ -2832,6 +2966,106 @@ fn remove_empty_parents(dir: &Path, stop_at: &Path) -> Result<(), std::io::Error
         };
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod branch_summary_tests {
+    use super::*;
+
+    fn commit_file(repo: &Repository, name: &str, content: &str, message: &str) {
+        let workdir = repo.workdir().unwrap();
+        std::fs::write(workdir.join(name), content).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new(name)).unwrap();
+        index.write().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        let sig = repo.signature().unwrap();
+        let parent = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
+        let parents: Vec<&git2::Commit> = parent.iter().collect();
+        repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)
+            .unwrap();
+    }
+
+    #[test]
+    fn reports_committed_and_uncommitted_work_separately() {
+        let dir =
+            std::env::temp_dir().join(format!("bytro-branch-summary-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let repo = Repository::init(&dir).unwrap();
+        {
+            let mut config = repo.config().unwrap();
+            config.set_str("user.name", "Test").unwrap();
+            config.set_str("user.email", "test@example.com").unwrap();
+        }
+        commit_file(&repo, "base.txt", "base\n", "chore: init");
+
+        // Pin the base commit as "main" (the default branch name varies by
+        // libgit2 config), then branch off for feature work.
+        let base_commit = repo.head().unwrap().peel_to_commit().unwrap();
+        repo.branch("main", &base_commit, true).unwrap();
+        repo.branch("feature", &base_commit, false).unwrap();
+        repo.set_head("refs/heads/feature").unwrap();
+        commit_file(&repo, "feature.txt", "feature\n", "feat: add feature");
+
+        // Uncommitted, untracked file — the typical "my PR content isn't
+        // committed yet" shape.
+        std::fs::write(dir.join("uncommitted.txt"), "brand new work\n").unwrap();
+
+        let summary = branch_summary(dir.to_str().unwrap(), "main").unwrap();
+
+        assert_eq!(summary.head_branch, "feature");
+        assert_eq!(summary.base_branch, "main");
+        assert_eq!(summary.commits, vec!["feat: add feature".to_string()]);
+        assert!(summary.files.iter().any(|f| f.path == "feature.txt"));
+        assert!(!summary.files.iter().any(|f| f.path == "uncommitted.txt"));
+        assert!(summary
+            .uncommitted_files
+            .iter()
+            .any(|f| f.path == "uncommitted.txt"));
+        assert!(summary.uncommitted_patch_excerpt.contains("brand new work"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn switch_branch_preserves_tracked_and_untracked_changes() {
+        let dir =
+            std::env::temp_dir().join(format!("bytro-safe-branch-switch-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let repo = Repository::init(&dir).unwrap();
+        {
+            let mut config = repo.config().unwrap();
+            config.set_str("user.name", "Test").unwrap();
+            config.set_str("user.email", "test@example.com").unwrap();
+        }
+        commit_file(&repo, "tracked.txt", "committed\n", "chore: init");
+
+        let head = repo.head().unwrap().peel_to_commit().unwrap();
+        repo.branch("feature", &head, false).unwrap();
+        drop(head);
+
+        std::fs::write(dir.join("tracked.txt"), "modified\n").unwrap();
+        std::fs::write(dir.join("untracked.txt"), "new work\n").unwrap();
+
+        switch_branch(dir.to_str().unwrap(), "feature").unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(dir.join("tracked.txt")).unwrap(),
+            "modified\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("untracked.txt")).unwrap(),
+            "new work\n"
+        );
+        assert_eq!(repo.head().unwrap().shorthand(), Some("feature"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
 
 #[cfg(test)]

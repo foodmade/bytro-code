@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   GitBranch,
+  GitPullRequest,
   RefreshCw,
   X,
   Download,
@@ -27,6 +28,8 @@ import { GitHistorySection } from "./git-history-section";
 import { GitCommitDetail } from "./git-commit-detail";
 import { GitHistoryModal } from "./git-history-modal";
 import { GitCloneAuthDialog } from "./git-clone-auth-dialog";
+import { PrModal } from "./pr-modal";
+import { usePrStore } from "@/stores/pr-store";
 import {
   defaultGitUsernameFromUrl,
   getGitHost,
@@ -589,6 +592,7 @@ function QuickActions({
   onPull,
   onPush,
   onStash,
+  onOpenPr,
   isPulling,
   isPushing,
   isStashing,
@@ -596,6 +600,7 @@ function QuickActions({
   readonly onPull: () => void;
   readonly onPush: () => void;
   readonly onStash: () => void;
+  readonly onOpenPr: () => void;
   readonly isPulling: boolean;
   readonly isPushing: boolean;
   readonly isStashing: boolean;
@@ -634,6 +639,13 @@ function QuickActions({
             label: t("git.stash"),
             badge: undefined,
             loading: isStashing,
+          },
+          {
+            action: onOpenPr,
+            icon: <GitPullRequest size={13} />,
+            label: t("git.pr.short"),
+            badge: undefined,
+            loading: false,
           },
         ] as const
       ).map(({ action, icon, label, badge, loading }) => (
@@ -1065,6 +1077,13 @@ export function GitPanel() {
     stashSave(workspacePath);
   }, [workspacePath, stashSave]);
 
+  const openPrModal = usePrStore((s) => s.openModal);
+  const isPrModalOpen = usePrStore((s) => s.isModalOpen);
+  const handleOpenPr = useCallback(() => {
+    if (!workspacePath) return;
+    openPrModal(workspacePath);
+  }, [workspacePath, openPrModal]);
+
   const handleSelectCommit = useCallback(
     (commitId: string) => {
       setSelectedCommit(commitId);
@@ -1124,6 +1143,7 @@ export function GitPanel() {
           onPull={handlePull}
           onPush={handlePush}
           onStash={handleStash}
+          onOpenPr={handleOpenPr}
           isPulling={isPulling}
           isPushing={isPushing}
           isStashing={isStashing}
@@ -1252,6 +1272,9 @@ export function GitPanel() {
           onClose={() => setHistoryModalFile(null)}
         />
       )}
+
+      {/* Pull request modal */}
+      {isPrModalOpen && workspacePath && <PrModal workspacePath={workspacePath} />}
 
       {/* Credential prompt for push/pull HTTPS authentication failures */}
       <GitCloneAuthDialog
