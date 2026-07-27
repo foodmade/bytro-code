@@ -836,7 +836,9 @@ pub fn switch_branch(path: &str, name: &str) -> Result<(), String> {
         .map_err(|e| format!("branch '{name}' not found: {e}"))?;
 
     let mut checkout_opts = CheckoutBuilder::new();
-    checkout_opts.force().remove_untracked(true);
+    // Preserve working-tree changes when moving newly generated PR work onto
+    // its branch. Conflicting branch switches fail instead of deleting files.
+    checkout_opts.safe();
 
     repo.checkout_tree(&obj, Some(&mut checkout_opts))
         .map_err(|e| format!("failed to checkout branch '{name}': {e}"))?;
@@ -3024,6 +3026,43 @@ mod branch_summary_tests {
             .iter()
             .any(|f| f.path == "uncommitted.txt"));
         assert!(summary.uncommitted_patch_excerpt.contains("brand new work"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn switch_branch_preserves_tracked_and_untracked_changes() {
+        let dir =
+            std::env::temp_dir().join(format!("bytro-safe-branch-switch-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let repo = Repository::init(&dir).unwrap();
+        {
+            let mut config = repo.config().unwrap();
+            config.set_str("user.name", "Test").unwrap();
+            config.set_str("user.email", "test@example.com").unwrap();
+        }
+        commit_file(&repo, "tracked.txt", "committed\n", "chore: init");
+
+        let head = repo.head().unwrap().peel_to_commit().unwrap();
+        repo.branch("feature", &head, false).unwrap();
+        drop(head);
+
+        std::fs::write(dir.join("tracked.txt"), "modified\n").unwrap();
+        std::fs::write(dir.join("untracked.txt"), "new work\n").unwrap();
+
+        switch_branch(dir.to_str().unwrap(), "feature").unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(dir.join("tracked.txt")).unwrap(),
+            "modified\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("untracked.txt")).unwrap(),
+            "new work\n"
+        );
+        assert_eq!(repo.head().unwrap().shorthand(), Some("feature"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }

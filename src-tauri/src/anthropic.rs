@@ -1597,14 +1597,15 @@ pub async fn generate_commit_message(
 
 // Keep in sync with PR_SYSTEM_PROMPT_TEMPLATE in src/lib/ai-one-shot.ts
 // (the sidecar/OAuth path uses the frontend copy).
-const PR_SYSTEM_PROMPT_TEMPLATE: &str = r#"You are a pull request description generator. Based on the branch commits and code changes provided, write a pull request title and description.
+const PR_SYSTEM_PROMPT_TEMPLATE: &str = r#"You are a pull request description generator. Based on the branch commits and code changes provided, write a suggested branch name, a pull request title, and a description.
 
 Rules:
-- First line: the PR title — concise, under 80 characters, may use a conventional-commit prefix (feat/fix/refactor/...)
+- First line: `branch: <name>` — a short kebab-case git branch name describing THESE changes, with a feat/fix/refactor/chore prefix (e.g. `branch: feat/pr-management`), always in English
+- Second line: the PR title — concise, under 80 characters, may use a conventional-commit prefix (feat/fix/refactor/...)
 - Then one blank line, then the description body in Markdown
 - The body: a short summary paragraph, then a bullet list of the key changes
 - Write the title and body in {language}
-- Reply with ONLY the title and description, no extra commentary, no markdown fences"#;
+- Reply with ONLY these elements, no extra commentary, no markdown fences"#;
 
 fn pr_prompt_language(language: Option<&str>) -> &'static str {
     match language {

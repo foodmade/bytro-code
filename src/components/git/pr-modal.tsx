@@ -33,20 +33,23 @@ import {
 } from "@/stores/pr-store";
 import { useGitStore, buildGitTokensMap } from "@/stores/git-store";
 import { useToastStore } from "@/stores/toast-store";
+import { useSettingsStore } from "@/stores/settings-store";
+import { useAppStore } from "@/stores";
 import { formatError } from "@/lib/format-error";
 
 // ── AI PR description generation ─────────────────────────────────────
 
 // Keep in sync with PR_SYSTEM_PROMPT_TEMPLATE in src-tauri/src/anthropic.rs
 // (the API-key path uses the Rust copy).
-const PR_SYSTEM_PROMPT_TEMPLATE = `You are a pull request description generator. Based on the branch commits and code changes provided, write a pull request title and description.
+const PR_SYSTEM_PROMPT_TEMPLATE = `You are a pull request description generator. Based on the branch commits and code changes provided, write a suggested branch name, a pull request title, and a description.
 
 Rules:
-- First line: the PR title — concise, under 80 characters, may use a conventional-commit prefix (feat/fix/refactor/...)
+- First line: \`branch: <name>\` — a short kebab-case git branch name describing THESE changes, with a feat/fix/refactor/chore prefix (e.g. \`branch: feat/pr-management\`), always in English
+- Second line: the PR title — concise, under 80 characters, may use a conventional-commit prefix (feat/fix/refactor/...)
 - Then one blank line, then the description body in Markdown
 - The body: a short summary paragraph, then a bullet list of the key changes
 - Write the title and body in {language}
-- Reply with ONLY the title and description, no extra commentary, no markdown fences`;
+- Reply with ONLY these elements, no extra commentary, no markdown fences`;
 
 const PR_AI_LANG_KEY = "pr-ai-language";
 type PrAiLanguage = "zh" | "en";
@@ -92,7 +95,7 @@ function buildBranchSummaryContent(summary: GitBranchSummary): string {
 
   if (summary.uncommitted_files.length > 0) {
     return [
-      `Branch: ${summary.head_branch} → ${summary.base_branch}`,
+      `Target base branch: ${summary.base_branch}`,
       `\nUncommitted working-tree changes — this is the intended content of the PR, describe THESE changes (+${summary.uncommitted_additions} -${summary.uncommitted_deletions}):\n${formatFileStats(summary.uncommitted_files)}`,
       summary.uncommitted_patch_excerpt
         ? `\nDiff of the uncommitted changes:\n${summary.uncommitted_patch_excerpt}`
@@ -104,24 +107,52 @@ function buildBranchSummaryContent(summary: GitBranchSummary): string {
   }
 
   return [
-    `Branch: ${summary.head_branch} → ${summary.base_branch}`,
+    `Target base branch: ${summary.base_branch}`,
     `\nCommits:\n${commits}`,
     `\nChanged files (+${summary.total_additions} -${summary.total_deletions}):\n${formatFileStats(summary.files)}`,
     summary.patch_excerpt ? `\nDiff excerpt:\n${summary.patch_excerpt}` : "",
   ].join("\n");
 }
 
-/** First line → title (markdown heading markers stripped), rest → body. */
-function parseGeneratedPr(text: string): { title: string; body: string } {
-  const trimmed = text.trim();
-  const newlineIdx = trimmed.indexOf("\n");
-  if (newlineIdx === -1) {
-    return { title: trimmed.replace(/^#+\s*/, ""), body: "" };
+function isValidGitBranchName(name: string): boolean {
+  return (
+    /^[A-Za-z0-9](?:[A-Za-z0-9._/-]{0,79}[A-Za-z0-9_-])?$/.test(name) &&
+    !name.includes("..") &&
+    !name.includes("//") &&
+    !name.includes("@{") &&
+    !name.endsWith(".lock") &&
+    name !== "@"
+  );
+}
+
+/** Optional `branch: <name>` first line → branch suggestion, next line →
+ *  title (markdown heading markers stripped), rest → body. The branch name
+ *  is validated so a hallucinated value can't reach `git branch`. */
+function parseGeneratedPr(text: string): {
+  branch: string | null;
+  title: string;
+  body: string;
+} {
+  const lines = text.trim().split("\n");
+  let branch: string | null = null;
+  let idx = 0;
+
+  const branchMatch = lines[0]?.match(/^\s*`?branch:\s*([^\s`]+)`?\s*$/i);
+  if (branchMatch) {
+    const candidate = branchMatch[1];
+    if (isValidGitBranchName(candidate)) {
+      branch = candidate;
+    }
+    idx = 1;
   }
-  return {
-    title: trimmed.slice(0, newlineIdx).trim().replace(/^#+\s*/, ""),
-    body: trimmed.slice(newlineIdx + 1).trim(),
-  };
+
+  while (idx < lines.length && !lines[idx].trim()) idx++;
+  const title = (lines[idx] ?? "").trim().replace(/^#+\s*/, "");
+  const body = lines
+    .slice(idx + 1)
+    .join("\n")
+    .trim();
+  return { branch, title, body };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -296,17 +327,38 @@ function PrCreateForm({
   const [aiLanguage, setAiLanguage] = useState<PrAiLanguage>(getStoredAiLanguage);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [summaryPreview, setSummaryPreview] = useState<GitBranchSummary | null>(null);
-  const [newBranchName, setNewBranchName] = useState("");
-  const [isCreatingBranch, setIsCreatingBranch] = useState(false);
-  const [submitPhase, setSubmitPhase] = useState<"idle" | "committing" | "pushing" | "creating">(
-    "idle",
-  );
+  /** New branch the PR will use. AI fills it; the user can edit it. */
+  const [plannedBranch, setPlannedBranch] = useState("");
+  /** Remembers a branch created during this form session so a retry after a
+   *  partial failure can switch back to it without trying to create it twice. */
+  const [createdBranch, setCreatedBranch] = useState<string | null>(null);
+  const [submitPhase, setSubmitPhase] = useState<
+    "idle" | "branching" | "committing" | "pushing" | "creating"
+  >("idle");
   const gitAhead = useGitStore((s) => s.gitInfo?.ahead ?? 0);
   const branches = useGitStore((s) => s.branches);
 
+  // Creating a PR always needs a platform token — check it BEFORE the
+  // one-click flow runs, not after commit+push already landed.
+  const repoHost = usePrStore((s) => s.repoInfo?.host ?? "");
+  const gitTokens = useSettingsStore((s) => s.gitTokens);
+  const gitHostCredentials = useSettingsStore((s) => s.gitHostCredentials);
+  const hasToken = useMemo(() => {
+    if (!repoHost) return true; // unknown host — let the backend surface it
+    if (repoHost === "github.com" || repoHost.endsWith(".github.com")) {
+      return Boolean(gitTokens.github?.trim());
+    }
+    return Boolean(gitHostCredentials[repoHost]?.token?.trim());
+  }, [repoHost, gitTokens, gitHostCredentials]);
+
   const effectiveBase = base.trim() || defaultBase;
-  const isSameBranch = currentBranch === effectiveBase;
   const uncommittedCount = summaryPreview?.uncommitted_files.length ?? 0;
+  const headBranch = plannedBranch.trim();
+  const isBranchValid = isValidGitBranchName(headBranch);
+  const willCreateBranch = isBranchValid && headBranch !== currentBranch;
+  const isSameBranch = Boolean(headBranch) && headBranch === effectiveBase;
+  const isReusingCurrentBranch =
+    Boolean(headBranch) && headBranch === currentBranch && createdBranch !== headBranch;
   const currentBranchInfo = branches.find((b) => b.is_current);
   const isUnpushed =
     gitAhead > 0 ||
@@ -366,20 +418,6 @@ function PrCreateForm({
     void git.loadBranches(workspacePath);
   }, [workspacePath, effectiveBase]);
 
-  const handleCreateBranch = useCallback(async () => {
-    const name = newBranchName.trim();
-    if (!name || isCreatingBranch) return;
-    setIsCreatingBranch(true);
-    try {
-      const git = useGitStore.getState();
-      await git.createBranch(workspacePath, name);
-      await git.switchBranch(workspacePath, name);
-      setNewBranchName("");
-    } finally {
-      setIsCreatingBranch(false);
-    }
-  }, [newBranchName, isCreatingBranch, workspacePath]);
-
   const handleSetAiLanguage = useCallback((lang: PrAiLanguage) => {
     setAiLanguage(lang);
     try {
@@ -405,6 +443,7 @@ function PrCreateForm({
         path: workspacePath,
         base: base.trim() || defaultBase,
       });
+      setSummaryPreview(summary);
       const userContent = buildBranchSummaryContent(summary);
       const target = resolved.target;
       let result: string;
@@ -431,36 +470,68 @@ function PrCreateForm({
       const parsed = parseGeneratedPr(result);
       if (parsed.title) setTitle(parsed.title);
       if (parsed.body) setBody(parsed.body);
+      if (parsed.branch) setPlannedBranch(parsed.branch);
     } catch (err: unknown) {
       useToastStore.getState().addToast("error", `${t("git.pr.ai.failed")}: ${formatError(err)}`);
     } finally {
       setIsGeneratingAi(false);
     }
-  }, [isGeneratingAi, workspacePath, base, defaultBase, aiLanguage, t]);
+  }, [
+    isGeneratingAi,
+    workspacePath,
+    base,
+    defaultBase,
+    aiLanguage,
+    t,
+  ]);
 
-  // One-click submit: commit outstanding work (PR title as the commit
-  // message) → push → create the PR. Steps that aren't needed are skipped.
+  // One-click submit: create/switch branch → commit outstanding work (PR
+  // title as the message) → push → create the PR.
   const handleSubmit = useCallback(async () => {
-    if (!title.trim() || submitPhase !== "idle" || isCreating || isSameBranch || isGeneratingAi)
+    if (
+      !title.trim() ||
+      submitPhase !== "idle" ||
+      isCreating ||
+      isSameBranch ||
+      isReusingCurrentBranch ||
+      isGeneratingAi ||
+      !isBranchValid ||
+      !hasToken
+    )
       return;
-    let phase: "committing" | "pushing" | "creating" = "creating";
+    let phase: "branching" | "committing" | "pushing" | "creating" = "creating";
+    // Track side effects that already landed so a late failure can tell the
+    // user their work is safe and the retry resumes from here.
+    let didBranch = false;
+    let didCommit = false;
+    let didPush = false;
     try {
-      if (uncommittedCount > 0) {
+      if (willCreateBranch) {
+        phase = "branching";
+        setSubmitPhase(phase);
+        if (createdBranch !== headBranch) {
+          await invoke("git_create_branch", { path: workspacePath, name: headBranch });
+          setCreatedBranch(headBranch);
+        }
+        await invoke("git_switch_branch", { path: workspacePath, name: headBranch });
+        didBranch = true;
+      }
+
+      const statuses = await invoke<GitFileStatus[]>("get_git_status", {
+        path: workspacePath,
+      });
+      if (statuses.length > 0) {
         phase = "committing";
         setSubmitPhase(phase);
-        const statuses = await invoke<GitFileStatus[]>("get_git_status", {
-          path: workspacePath,
-        });
         const unstaged = statuses.filter((f) => !f.is_staged).map((f) => f.path);
         if (unstaged.length > 0) {
           await invoke("git_stage_files", { path: workspacePath, files: unstaged });
         }
-        if (statuses.length > 0) {
-          await invoke<string>("git_commit", { path: workspacePath, message: title.trim() });
-        }
+        await invoke<string>("git_commit", { path: workspacePath, message: title.trim() });
+        didCommit = true;
       }
 
-      if (uncommittedCount > 0 || isUnpushed) {
+      if (didBranch || didCommit || isUnpushed) {
         phase = "pushing";
         setSubmitPhase(phase);
         await invoke("git_push", {
@@ -468,6 +539,7 @@ function PrCreateForm({
           gitTokens: buildGitTokensMap(),
           credentials: null,
         });
+        didPush = true;
       }
 
       phase = "creating";
@@ -475,22 +547,34 @@ function PrCreateForm({
       await createPr({
         title: title.trim(),
         body,
-        head: currentBranch,
-        base: base.trim() || defaultBase,
+        head: headBranch,
+        base: effectiveBase,
         draft,
       });
       useToastStore.getState().addToast("info", t("git.pr.createSuccess"));
       onCreated();
     } catch (err: unknown) {
-      const message =
-        phase === "committing"
+      const coreMessage =
+        phase === "branching"
+          ? `${t("git.pr.branchFailed")}: ${formatError(err)}`
+          : phase === "committing"
           ? `${t("git.pr.commitFailed")}: ${formatError(err)}`
           : phase === "pushing"
             ? isGitAuthFailure(err)
               ? t("git.pr.pushAuthFailed")
               : `${t("git.pr.pushFailed")}: ${formatError(err)}`
             : `${t("git.pr.createFailed")}: ${formatError(err)}`;
-      useToastStore.getState().addToast("error", message);
+      const progressNote =
+        phase === "creating" && (didCommit || didPush)
+          ? t("git.pr.retryAfterSync")
+          : phase === "pushing" && didCommit
+            ? t("git.pr.retryAfterCommit")
+            : phase === "committing" && didBranch
+              ? t("git.pr.retryAfterBranch")
+            : null;
+      useToastStore
+        .getState()
+        .addToast("error", progressNote ? `${coreMessage} — ${progressNote}` : coreMessage);
     } finally {
       setSubmitPhase("idle");
       // Whatever happened, resync the warnings and the git panel with the
@@ -500,15 +584,18 @@ function PrCreateForm({
   }, [
     title,
     body,
-    base,
     draft,
-    currentBranch,
-    defaultBase,
     submitPhase,
     isCreating,
     isSameBranch,
+    isReusingCurrentBranch,
     isGeneratingAi,
-    uncommittedCount,
+    isBranchValid,
+    hasToken,
+    willCreateBranch,
+    createdBranch,
+    headBranch,
+    effectiveBase,
     isUnpushed,
     workspacePath,
     createPr,
@@ -541,17 +628,22 @@ function PrCreateForm({
       <div className="flex items-center justify-between flex-wrap" style={{ gap: 8 }}>
         <div className="flex items-center flex-wrap" style={{ gap: 6 }}>
           <GitBranch size={12} style={{ color: "var(--color-muted)" }} />
-          <span
-            className="text-[11px] font-mono"
+          <input
+            value={plannedBranch}
+            onChange={(e) => setPlannedBranch(e.target.value)}
+            placeholder={t("git.pr.newBranchPlaceholder")}
+            className="font-mono"
+            title={t("git.pr.plannedBranchTitle")}
+            aria-invalid={Boolean(plannedBranch) && !isBranchValid}
             style={{
-              color: "var(--color-accent-purple)",
-              backgroundColor: "color-mix(in srgb, var(--color-accent-purple) 12%, transparent)",
-              borderRadius: 4,
-              padding: "1px 6px",
+              ...inputStyle,
+              width: 190,
+              padding: "3px 8px",
+              fontSize: 11,
+              borderColor:
+                Boolean(plannedBranch) && !isBranchValid ? "#EF4444" : "var(--color-border)",
             }}
-          >
-            {currentBranch}
-          </span>
+          />
           <span className="text-[11px]" style={{ color: "var(--color-muted)" }}>
             →
           </span>
@@ -622,11 +714,43 @@ function PrCreateForm({
 
       {/* Pre-flight warnings: the PR content lives in the working tree until
           the user branches / commits / pushes — surface that before "Create". */}
-      {isSameBranch && (
+      {!hasToken && (
         <div
-          className="flex flex-col"
+          className="flex items-center justify-between"
           style={{
             gap: 8,
+            padding: "8px 10px",
+            borderRadius: 6,
+            border: "1px solid #EF444455",
+            backgroundColor: "#EF444412",
+          }}
+        >
+          <div className="flex items-center min-w-0" style={{ gap: 6 }}>
+            <AlertTriangle size={12} className="shrink-0" style={{ color: "#EF4444" }} />
+            <span className="text-[11px]" style={{ color: "#EF4444" }}>
+              {t("git.pr.tokenRequired")}
+            </span>
+          </div>
+          <button
+            onClick={() => useAppStore.getState().openSettings("git")}
+            className="rounded transition-colors shrink-0"
+            style={{
+              padding: "3px 10px",
+              fontSize: 11,
+              color: "var(--color-foreground)",
+              border: "1px solid var(--color-border)",
+              cursor: "pointer",
+            }}
+          >
+            {t("git.pr.openSettings")}
+          </button>
+        </div>
+      )}
+      {isSameBranch && (
+        <div
+          className="flex items-center"
+          style={{
+            gap: 6,
             padding: "8px 10px",
             borderRadius: 6,
             border: "1px solid #EF444455",
@@ -639,38 +763,40 @@ function PrCreateForm({
               {t("git.pr.sameBranch")}
             </span>
           </div>
-          <div className="flex items-center" style={{ gap: 6 }}>
-            <input
-              value={newBranchName}
-              onChange={(e) => setNewBranchName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleCreateBranch();
-              }}
-              placeholder={t("git.pr.newBranchPlaceholder")}
-              className="font-mono"
-              style={{ ...inputStyle, width: 200, padding: "3px 8px", fontSize: 11 }}
-            />
-            <button
-              onClick={() => void handleCreateBranch()}
-              disabled={!newBranchName.trim() || isCreatingBranch}
-              className="flex items-center rounded transition-colors disabled:opacity-50"
-              style={{
-                gap: 4,
-                padding: "3px 10px",
-                fontSize: 11,
-                color: "var(--color-foreground)",
-                border: "1px solid var(--color-border)",
-                cursor: "pointer",
-              }}
-            >
-              {isCreatingBranch ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <GitBranch size={11} />
-              )}
-              {t("git.pr.createBranch")}
-            </button>
-          </div>
+        </div>
+      )}
+      {isReusingCurrentBranch && (
+        <div
+          className="flex items-center"
+          style={{
+            gap: 6,
+            padding: "8px 10px",
+            borderRadius: 6,
+            border: "1px solid #EF444455",
+            backgroundColor: "#EF444412",
+          }}
+        >
+          <AlertTriangle size={12} className="shrink-0" style={{ color: "#EF4444" }} />
+          <span className="text-[11px]" style={{ color: "#EF4444" }}>
+            {t("git.pr.currentBranchReused")}
+          </span>
+        </div>
+      )}
+      {plannedBranch && !isBranchValid && (
+        <div
+          className="flex items-center"
+          style={{
+            gap: 6,
+            padding: "8px 10px",
+            borderRadius: 6,
+            border: "1px solid #EF444455",
+            backgroundColor: "#EF444412",
+          }}
+        >
+          <AlertTriangle size={12} className="shrink-0" style={{ color: "#EF4444" }} />
+          <span className="text-[11px]" style={{ color: "#EF4444" }}>
+            {t("git.pr.branchInvalid")}
+          </span>
         </div>
       )}
       {uncommittedCount > 0 && (
@@ -733,8 +859,26 @@ function PrCreateForm({
       <div className="flex items-center" style={{ gap: 8 }}>
         <button
           onClick={handleSubmit}
-          disabled={!title.trim() || submitPhase !== "idle" || isCreating || isSameBranch}
-          title={isSameBranch ? t("git.pr.sameBranch") : undefined}
+          disabled={
+            !title.trim() ||
+            submitPhase !== "idle" ||
+            isCreating ||
+            isSameBranch ||
+            isReusingCurrentBranch ||
+            !isBranchValid ||
+            !hasToken
+          }
+          title={
+            !hasToken
+              ? t("git.pr.tokenRequired")
+              : !isBranchValid
+                ? t("git.pr.branchInvalid")
+                : isReusingCurrentBranch
+                  ? t("git.pr.currentBranchReused")
+              : isSameBranch
+                ? t("git.pr.sameBranch")
+                : undefined
+          }
           className="flex items-center justify-center rounded transition-colors disabled:opacity-50"
           style={{
             gap: 6,
@@ -752,13 +896,17 @@ function PrCreateForm({
           ) : (
             <Plus size={12} />
           )}
-          {submitPhase === "committing"
-            ? t("git.pr.committing")
+          {submitPhase === "branching"
+            ? t("git.pr.branching")
+            : submitPhase === "committing"
+              ? t("git.pr.committing")
             : submitPhase === "pushing"
               ? t("git.pr.pushing")
               : submitPhase === "creating" || isCreating
                 ? t("git.pr.creating")
-                : uncommittedCount > 0
+                : willCreateBranch
+                  ? t("git.pr.branchAndCreate")
+                  : uncommittedCount > 0
                   ? t("git.pr.commitAndCreate")
                   : isUnpushed
                     ? t("git.pr.pushAndCreate")
