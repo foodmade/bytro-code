@@ -23,8 +23,8 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.220",
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "openai": "^6.49.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "openai": "^7.2.0",
     "zod": "^4.4.3"
   },
   "overrides": {
@@ -38,7 +38,7 @@
     "codex": "0.144.4"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "esbuild": "^0.28.1",
     "typescript": "~7.0.2",
     "vitest": "^4.0.18"
